@@ -1,0 +1,195 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Creator Studio - YouTube Ideas Generator</title>
+<style>
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  color: #f8fafc;
+  background: radial-gradient(circle at top, #30205c, #0c1020 65%);
+  min-height: 100vh;
+}
+.container {
+  max-width: 900px;
+  margin: auto;
+  padding: 30px 18px;
+}
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 55px;
+}
+.logo { font-size: 22px; font-weight: bold; }
+.logo span { color: #a78bfa; }
+.tag {
+  color: #c4b5fd;
+  border: 1px solid #6d5aa0;
+  border-radius: 30px;
+  padding: 8px 12px;
+  font-size: 12px;
+}
+h1 {
+  text-align: center;
+  font-size: clamp(30px, 6vw, 52px);
+  margin-bottom: 12px;
+}
+.subtitle {
+  text-align: center;
+  color: #aeb9d0;
+  line-height: 1.6;
+  margin-bottom: 35px;
+}
+.panel, .idea {
+  background: #1c2338;
+  border: 1px solid #38415e;
+  border-radius: 18px;
+  padding: 25px;
+}
+label {
+  display: block;
+  font-weight: bold;
+  margin-bottom: 12px;
+}
+input {
+  width: 100%;
+  padding: 16px;
+  background: #10182a;
+  border: 1px solid #4a5575;
+  border-radius: 10px;
+  color: white;
+  font-size: 16px;
+  outline: none;
+}
+input:focus { border-color: #a78bfa; }
+button {
+  border: none;
+  cursor: pointer;
+  font-weight: bold;
+  border-radius: 10px;
+}
+.generate {
+  width: 100%;
+  padding: 17px;
+  margin-top: 18px;
+  background: linear-gradient(90deg, #7c3aed, #4f8cff);
+  color: white;
+  font-size: 16px;
+}
+.generate:hover { filter: brightness(1.15); }
+#results { margin-top: 35px; }
+.idea {
+  margin: 14px 0;
+  padding: 20px;
+}
+.idea small { color: #a78bfa; }
+.idea h3 { line-height: 1.5; }
+.copy {
+  padding: 10px 15px;
+  color: white;
+  background: #394565;
+}
+.copy:hover { background: #596a9a; }
+footer {
+  text-align: center;
+  margin-top: 60px;
+  color: #8995ae;
+  font-size: 13px;
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div class="logo">▶ Creator<span>Studio</span></div>
+    <div class="tag">FREE TOOL</div>
+  </header>
+
+  <h1>YouTube Ideas Generator</h1>
+  <p class="subtitle">
+    Generate 10 creative YouTube video titles in seconds.
+    Find your next viral video idea!
+  </p>
+
+  <div class="panel">
+    <label for="topic">Enter Your YouTube Niche</label>
+    <input id="topic" placeholder="Example: History, Gaming, Facts">
+    <button class="generate" id="generate">
+      ✨ Generate 10 Ideas
+    </button>
+  </div>
+
+  <div id="results" aria-live="polite"></div>
+
+  <footer>Creator Studio | Free YouTube Ideas Tool</footer>
+</div>
+
+<script>
+const templates = [
+  "10 Amazing Facts About {topic}",
+  "The Hidden Truth About {topic}",
+  "How {topic} Changed the World",
+  "Top 10 Secrets of {topic}",
+  "The Dark Side of {topic}",
+  "Untold Stories of {topic}",
+  "Why {topic} Still Matters Today",
+  "5 Mysteries About {topic}",
+  "The Biggest Myths About {topic}",
+  "Everything You Need to Know About {topic}"
+];
+
+function generateIdeas() {
+  const topic = document.getElementById("topic").value.trim();
+  const results = document.getElementById("results");
+
+  if (!topic) {
+    alert("Please enter a topic first!");
+    return;
+  }
+
+  results.replaceChildren();
+
+  const heading = document.createElement("h2");
+  heading.textContent = "Your 10 Video Ideas";
+  results.appendChild(heading);
+
+  templates.forEach((template, index) => {
+    const title = template.replace("{topic}", topic);
+
+    const card = document.createElement("div");
+    card.className = "idea";
+
+    const number = document.createElement("small");
+    number.textContent = "IDEA " + String(index + 1).padStart(2, "0");
+
+    const text = document.createElement("h3");
+    text.textContent = title;
+
+    const button = document.createElement("button");
+    button.className = "copy";
+    button.textContent = "Copy Title";
+
+    button.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(title);
+        button.textContent = "Copied!";
+      } catch (error) {
+        button.textContent = "Select title to copy";
+      }
+    });
+
+    card.append(number, text, button);
+    results.appendChild(card);
+  });
+}
+
+document.getElementById("generate")
+  .addEventListener("click", generateIdeas);
+</script>
+</body>
+</html>
