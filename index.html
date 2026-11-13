@@ -236,10 +236,80 @@ function makeScript() {
     <button onclick="startVoice()">Play Voice</button>
     <button onclick="pauseVoice()">Pause</button>
     <button onclick="stopVoice()">Stop</button>
+    <button type="button" onclick="downloadVoiceScript()">Download Script (.txt)</button>
+  </div>
+  <div style="margin-top:16px;padding:14px;background:#111827;border-radius:10px">
+    <strong>Record Voiceover Audio (experimental)</strong>
+    <p style="font-size:13px;line-height:1.5">Desktop Chrome: Click Start Audio Recording, choose <b>This Tab</b> and enable <b>Share tab audio</b>. Then click Play Voice. When the speech finishes, click Stop &amp; Download. Some browser/system voices cannot be captured as tab audio; listen to the downloaded file to verify.</p>
+    <button type="button" id="voiceRecordStart" onclick="startVoiceRecording()">Start Audio Recording</button>
+    <button type="button" id="voiceRecordStop" onclick="stopVoiceRecording()" disabled>Stop &amp; Download Audio</button>
+    <p id="voiceRecordStatus" role="status" aria-live="polite" style="font-size:13px">Not recording.</p>
   </div>
 </section>
 
 <script>
+let voiceAudioRecorder = null;
+let voiceAudioStream = null;
+let voiceAudioChunks = [];
+function downloadVoiceScript() {
+  const value = document.getElementById('voiceText').value.trim();
+  if (!value) return alert('Paste your script first.');
+  const url = URL.createObjectURL(new Blob([value], {type:'text/plain;charset=utf-8'}));
+  const link = document.createElement('a');
+  link.href = url; link.download = 'creatorstudio-voiceover-script.txt'; link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 30000);
+}
+async function startVoiceRecording() {
+  const status = document.getElementById('voiceRecordStatus');
+  if (!document.getElementById('voiceText').value.trim()) { status.textContent = 'Paste your script first.'; return; }
+  if (!navigator.mediaDevices?.getDisplayMedia || !window.MediaRecorder) { status.textContent = 'Recording requires a compatible desktop browser (try Chrome).'; return; }
+  if (voiceAudioRecorder) return;
+  try {
+    const display = await navigator.mediaDevices.getDisplayMedia({video:true,audio:true});
+    const audioTracks = display.getAudioTracks();
+    if (!audioTracks.length) {
+      display.getTracks().forEach(t=>t.stop());
+      status.textContent = 'No tab audio shared. Retry and turn on Share tab audio.';
+      return;
+    }
+    const audioStream = new MediaStream(audioTracks);
+    const mime = ['audio/webm;codecs=opus','audio/webm','video/webm'].find(t=>MediaRecorder.isTypeSupported(t));
+    if (!mime) throw new Error('WebM audio recording not supported.');
+    voiceAudioStream = display;
+    voiceAudioChunks = [];
+    const recorder = new MediaRecorder(audioStream, {mimeType:mime});
+    voiceAudioRecorder = recorder;
+    document.getElementById('voiceRecordStart').disabled = true;
+    document.getElementById('voiceRecordStop').disabled = false;
+    recorder.ondataavailable = e => { if(e.data.size) voiceAudioChunks.push(e.data); };
+    recorder.onstop = () => {
+      const data = voiceAudioChunks;
+      const type = recorder.mimeType;
+      display.getTracks().forEach(t=>t.stop());
+      voiceAudioRecorder = null; voiceAudioStream = null;
+      document.getElementById('voiceRecordStart').disabled = false;
+      document.getElementById('voiceRecordStop').disabled = true;
+      if (!data.length) {status.textContent = 'No audio captured. Try again.'; return;}
+      const blob = new Blob(data, {type});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url;
+      a.download = 'creatorstudio-voiceover.webm'; a.click();
+      setTimeout(()=>URL.revokeObjectURL(url), 60000);
+      status.textContent = 'Audio file downloaded. Play it to confirm speech was captured.';
+    };
+    recorder.onerror = () => {status.textContent = 'Recording error.'; stopVoiceRecording();};
+    display.getVideoTracks().forEach(t=>t.addEventListener('ended',()=>{if(voiceAudioRecorder?.state==='recording') stopVoiceRecording();},{once:true}));
+    recorder.start(500);
+    status.textContent = 'Recording tab audio. Click Play Voice now, then Stop & Download.';
+  } catch (e) {
+    if (voiceAudioStream) voiceAudioStream.getTracks().forEach(t=>t.stop());
+    voiceAudioStream = null; voiceAudioRecorder = null;
+    status.textContent = 'Could not start recording: ' + e.message;
+  }
+}
+function stopVoiceRecording() {
+  if (voiceAudioRecorder?.state === 'recording') voiceAudioRecorder.stop();
+}
 function startVoice() {
   const text = document.getElementById("voiceText").value.trim();
   if (!text) {
