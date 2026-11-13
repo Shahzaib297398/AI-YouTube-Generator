@@ -662,7 +662,7 @@ async function exportTrim() {
 <h2>🕺 Stickman Animation Maker</h2><p>Create a free animated stickman clip. Choose movement, caption and length, then export a WebM video with optional uploaded narration and music.</p>
 <div class="two"><div><label for="stickMove">Movement</label><select id="stickMove"><option value="walk">Walking</option><option value="wave">Waving</option><option value="jump">Jumping</option><option value="dance">Dancing</option></select></div><div><label for="stickBg">Background</label><select id="stickBg"><option value="light">White</option><option value="dark">Dark</option><option value="blue">Blue</option></select></div><div><label for="stickSeconds">Duration</label><select id="stickSeconds"><option value="5">5 seconds</option><option value="10">10 seconds</option><option value="15">15 seconds</option><option value="30">30 seconds</option></select></div></div>
 <label for="stickCaption">Caption</label><input id="stickCaption" maxlength="90" value="My Stickman Story"/>
-<label for="stickAudio">Voiceover audio (optional: WebM, MP3, WAV)</label><input type="file" id="stickAudio" accept="audio/*,.webm"/><label for="stickMusic">Background music (optional)</label><input type="file" id="stickMusic" accept="audio/*,.webm"/><canvas id="stickCanvas" width="1280" height="720"></canvas><div><button id="stickPreview">Preview</button><button id="stickExport">Export Stickman WebM</button><button id="stickStop" disabled>Stop</button></div><p id="stickStatus" role="status">Ready.</p>
+<label for="stickNarration">Automatic English voiceover script</label><textarea id="stickNarration" rows="3" placeholder="Example: Once upon a time, a stickman started walking."></textarea><p>For automatic voice: Chrome → This Tab → Share tab audio. No separate audio file needed.</p><label for="stickAudio">Voiceover audio (optional: WebM, MP3, WAV)</label><input type="file" id="stickAudio" accept="audio/*,.webm"/><label for="stickMusic">Background music (optional)</label><input type="file" id="stickMusic" accept="audio/*,.webm"/><canvas id="stickCanvas" width="1280" height="720"></canvas><div><button id="stickPreview">Preview</button><button id="stickExport">Export Stickman WebM</button><button id="stickStop" disabled>Stop</button></div><p id="stickStatus" role="status">Ready.</p>
 </section>
 <section class="maker" id="documentary-maker">
 <h2>🎞️ Documentary Video Maker</h2><p>Make a simple documentary slideshow from your own images and narration captions. Export a WebM video with optional uploaded narration and music.</p>
@@ -670,7 +670,7 @@ async function exportTrim() {
 <label for="docImages">Upload scene images (multiple)</label><input type="file" id="docImages" accept="image/*" multiple/>
 <label for="docCaptions">Scene captions (one line per image, in order)</label><textarea id="docCaptions" rows="5" placeholder="The pyramids of Giza...&#10;The Nile shaped ancient life..."></textarea>
 <div class="two"><div><label for="docDuration">Seconds per image</label><select id="docDuration"><option value="3">3</option><option value="5" selected>5</option><option value="8">8</option><option value="10">10</option></select></div><div><label for="docSize">Export format</label><select id="docSize"><option value="wide">YouTube 16:9</option><option value="vertical">Shorts 9:16</option></select></div></div>
-<label for="docAudio">Voiceover audio (optional: WebM, MP3, WAV)</label><input type="file" id="docAudio" accept="audio/*,.webm"/><label for="docMusic">Background music (optional)</label><input type="file" id="docMusic" accept="audio/*,.webm"/><canvas id="docCanvas" width="1280" height="720"></canvas><div><button id="docPreview">Preview</button><button id="docExport">Export Documentary WebM</button><button id="docStop" disabled>Stop</button></div><p id="docStatus" role="status">Upload images to begin.</p>
+<label for="docNarration">Automatic English voiceover script</label><textarea id="docNarration" rows="4" placeholder="Example: Ancient Egypt was home to remarkable pyramids and pharaohs."></textarea><p>For automatic voice: Chrome → This Tab → Share tab audio. No separate audio file needed.</p><label for="docAudio">Voiceover audio (optional: WebM, MP3, WAV)</label><input type="file" id="docAudio" accept="audio/*,.webm"/><label for="docMusic">Background music (optional)</label><input type="file" id="docMusic" accept="audio/*,.webm"/><canvas id="docCanvas" width="1280" height="720"></canvas><div><button id="docPreview">Preview</button><button id="docExport">Export Documentary WebM</button><button id="docStop" disabled>Stop</button></div><p id="docStatus" role="status">Upload images to begin.</p>
 </section>
 <script>
 (()=>{
@@ -681,7 +681,9 @@ async function recorderFor(canvas,prefix,onDone,onFail){
  const mime=['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'].find(x=>MediaRecorder.isTypeSupported(x));
  if(!mime)throw Error('WebM not supported.');
  const stream=canvas.captureStream(30),parts=[];
- let audioCtx=null,sources=[];
+ let audioCtx=null,sources=[],display=null;
+ const narration=el(prefix+'Narration').value.trim();
+ if(narration && el(prefix+'Audio').files.length)throw Error('Use either automatic narration or an uploaded voiceover, not both.');
  const voice=el(prefix+'Audio').files[0],music=el(prefix+'Music').files[0];
  try {
   if(voice||music){
@@ -697,27 +699,50 @@ async function recorderFor(canvas,prefix,onDone,onFail){
    }
    dest.stream.getAudioTracks().forEach(track=>stream.addTrack(track));
   }
+  if(narration){
+   if(!navigator.mediaDevices?.getDisplayMedia || !('speechSynthesis' in window))throw Error('Automatic voice needs desktop Chrome with tab audio sharing.');
+   display=await navigator.mediaDevices.getDisplayMedia({video:true,audio:true});
+   const tracks=display.getAudioTracks();
+   if(!tracks.length)throw Error('No tab audio. Select This Tab and enable Share tab audio.');
+   // Capture the tab's audio, including speech synthesis when Chrome routes it there.
+   if(audioCtx){
+    const source=audioCtx.createMediaStreamSource(new MediaStream(tracks));
+    const destination=audioCtx.createMediaStreamDestination();
+    source.connect(destination);
+    destination.stream.getAudioTracks().forEach(track=>stream.addTrack(track));
+   }else tracks.forEach(track=>stream.addTrack(track));
+  }
   const rec=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:3500000});
   rec.ondataavailable=e=>{if(e.data.size)parts.push(e.data)};
   rec.onstop=()=>{
    sources.forEach(source=>{try{source.stop()}catch(_){}});
-   stream.getTracks().forEach(t=>t.stop());if(audioCtx)audioCtx.close();
+   stream.getTracks().forEach(t=>t.stop());if(display)display.getTracks().forEach(t=>t.stop());if(audioCtx)audioCtx.close();
    if(!parts.length){onFail('No video data captured.');return}
    const blob=new Blob(parts,{type:'video/webm'}),url=URL.createObjectURL(blob),a=document.createElement('a');
    a.href=url;a.download=prefix==='stick'?'stickman-animation.webm':'documentary-video.webm';
    document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);onDone();
   };
   rec.onerror=()=>onFail('Recording failed.');
-  return {rec,start(){rec.start(500);sources.forEach(source=>source.start(0))}};
- }catch(e){stream.getTracks().forEach(t=>t.stop());if(audioCtx)audioCtx.close();throw e}
+  let speechDone=!narration;
+  return {rec,hasNarration:!!narration,isSpeechDone:()=>speechDone,start(){
+   rec.start(500);sources.forEach(source=>source.start(0));
+   if(narration){
+    speechSynthesis.cancel();
+    const utterance=new SpeechSynthesisUtterance(narration);
+    utterance.lang='en-US';utterance.rate=1;
+    utterance.onend=()=>{speechDone=true};utterance.onerror=()=>{speechDone=true};
+    speechSynthesis.speak(utterance);
+   }
+  }};
+ }catch(e){stream.getTracks().forEach(t=>t.stop());if(display)display.getTracks().forEach(t=>t.stop());if(audioCtx)audioCtx.close();throw e}
 }
 function drawStick(t){const c=el('stickCanvas'),ctx=c.getContext('2d'),W=c.width,H=c.height,move=el('stickMove').value,bg=el('stickBg').value;ctx.fillStyle=bg==='light'?'#f8fafc':bg==='blue'?'#164e83':'#0f172a';ctx.fillRect(0,0,W,H);const dark=bg==='light';ctx.strokeStyle=dark?'#111827':'#f8fafc';ctx.fillStyle=ctx.strokeStyle;ctx.lineWidth=12;ctx.lineCap='round';const phase=t*2*Math.PI,shift=move==='walk'?Math.sin(t*.9)*W*.22:0,jump=move==='jump'?Math.abs(Math.sin(phase*.8))*125:0,bob=move==='dance'?Math.sin(phase*1.5)*20:0,x=W/2+shift,y=H*.53-jump+bob;ctx.beginPath();ctx.arc(x,y-125,40,0,Math.PI*2);ctx.stroke();function line(x1,y1,x2,y2){ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke()}line(x,y-85,x,y+85);const swing=Math.sin(phase*1.7)*65;line(x,y-40,x-95,y+(move==='wave'? -80:move==='walk'?swing:-15));line(x,y-40,x+95,y+(move==='wave'?-90+Math.sin(phase*2)*40:move==='walk'?-swing:move==='dance'?Math.sin(phase)*80:-15));line(x,y+85,x-65+(move==='walk'?swing:move==='dance'?Math.sin(phase)*40:0),y+205);line(x,y+85,x+65-(move==='walk'?swing:move==='dance'?Math.sin(phase)*40:0),y+205);ctx.strokeStyle=dark?'#64748b':'#94a3b8';ctx.lineWidth=4;line(0,H*.86,W,H*.86);text(ctx,el('stickCaption').value,W/2,80,W-100,48)}
 let stickJob=null;function stopStick(){if(!stickJob)return;cancelAnimationFrame(stickJob.raf);if(stickJob.rec&&stickJob.rec.state!=='inactive')stickJob.rec.stop();stickJob=null;el('stickStop').disabled=true;el('stickExport').disabled=false}
-async function runStick(exporting){stopStick();const seconds=Number(el('stickSeconds').value),start=performance.now(),status=el('stickStatus');let rec=null;if(exporting){try{const jobRecorder=await recorderFor(el('stickCanvas'),'stick',()=>status.textContent='Stickman video downloaded!',e=>status.textContent=e);rec=jobRecorder.rec;jobRecorder.start()}catch(e){status.textContent=e.message;return}}el('stickStop').disabled=false;el('stickExport').disabled=true;stickJob={rec,raf:0};const job=stickJob;function frame(now){if(stickJob!==job)return;const t=(now-start)/1000;drawStick(t);if(t>=seconds){stopStick();if(!exporting)status.textContent='Preview finished.';return}job.raf=requestAnimationFrame(frame)}status.textContent=exporting?'Recording stickman video...':'Preview playing...';job.raf=requestAnimationFrame(frame)}el('stickPreview').onclick=()=>runStick(false);el('stickExport').onclick=()=>runStick(true);el('stickStop').onclick=()=>{stopStick();el('stickStatus').textContent='Stopped. Partial export may download.'};drawStick(0);
+async function runStick(exporting){stopStick();const seconds=Number(el('stickSeconds').value),start=performance.now(),status=el('stickStatus');let rec=null,voiceJob=null;if(exporting){try{const jobRecorder=await recorderFor(el('stickCanvas'),'stick',()=>status.textContent='Stickman video downloaded!',e=>status.textContent=e);rec=jobRecorder.rec;voiceJob=jobRecorder;jobRecorder.start()}catch(e){status.textContent=e.message;return}}el('stickStop').disabled=false;el('stickExport').disabled=true;stickJob={rec,raf:0};const job=stickJob;function frame(now){if(stickJob!==job)return;const t=(now-start)/1000;drawStick(t);if(t>=seconds&&(!voiceJob||voiceJob.isSpeechDone()||t>=120)){stopStick();if(!exporting)status.textContent='Preview finished.';return}job.raf=requestAnimationFrame(frame)}status.textContent=exporting?'Recording stickman video...':'Preview playing...';job.raf=requestAnimationFrame(frame)}el('stickPreview').onclick=()=>runStick(false);el('stickExport').onclick=()=>runStick(true);el('stickStop').onclick=()=>{stopStick();el('stickStatus').textContent='Stopped. Partial export may download.'};drawStick(0);
 let images=[],urls=[],docJob=null;el('docImages').onchange=async e=>{stopDoc();urls.forEach(URL.revokeObjectURL);urls=[];images=[];const files=[...e.target.files].filter(f=>f.type.startsWith('image/')).slice(0,60);for(const f of files){const url=URL.createObjectURL(f);urls.push(url);try{const img=new Image();img.src=url;await img.decode();images.push(img)}catch(_){}}el('docStatus').textContent=images.length+' image(s) ready.';drawDoc(0)};
 function drawDoc(t){const c=el('docCanvas'),ctx=c.getContext('2d'),wide=el('docSize').value==='wide';if(c.width!==(wide?1280:720)){c.width=wide?1280:720;c.height=wide?720:1280}const W=c.width,H=c.height;ctx.fillStyle='#0b1222';ctx.fillRect(0,0,W,H);if(!images.length){text(ctx,'Upload images to start',W/2,H/2,W-30,wide?44:30);return}const per=Number(el('docDuration').value),idx=Math.min(images.length-1,Math.floor(t/per)),img=images[idx],scale=Math.max(W/img.width,H/img.height),w=img.width*scale,h=img.height*scale;ctx.save();ctx.translate(W/2,H/2);const zoom=1+.04*((t%per)/per);ctx.scale(zoom,zoom);ctx.drawImage(img,-w/2,-h/2,w,h);ctx.restore();ctx.fillStyle='rgba(0,0,0,.58)';ctx.fillRect(0,H-180,W,180);text(ctx,el('docTitle').value,W/2,65,W-40,wide?42:34);const captions=el('docCaptions').value.split('\n');text(ctx,captions[idx]||'Scene '+(idx+1),W/2,H-95,W-35,wide?36:30);text(ctx,(idx+1)+' / '+images.length,W/2,H-35,W-35,22)}
 function stopDoc(){if(!docJob)return;cancelAnimationFrame(docJob.raf);if(docJob.rec&&docJob.rec.state!=='inactive')docJob.rec.stop();docJob=null;el('docStop').disabled=true;el('docExport').disabled=false}
-async function runDoc(exporting){stopDoc();if(!images.length){el('docStatus').textContent='Upload at least one image.';return}drawDoc(0);let rec=null;const status=el('docStatus');if(exporting){try{const jobRecorder=await recorderFor(el('docCanvas'),'doc',()=>status.textContent='Documentary video downloaded!',e=>status.textContent=e);rec=jobRecorder.rec;jobRecorder.start()}catch(e){status.textContent=e.message;return}}const duration=images.length*Number(el('docDuration').value),start=performance.now();el('docStop').disabled=false;el('docExport').disabled=true;docJob={rec,raf:0};const job=docJob;function frame(now){if(docJob!==job)return;const t=(now-start)/1000;drawDoc(t);if(t>=duration){stopDoc();if(!exporting)status.textContent='Preview finished.';return}job.raf=requestAnimationFrame(frame)}status.textContent=exporting?'Recording documentary...':'Preview playing...';job.raf=requestAnimationFrame(frame)}el('docPreview').onclick=()=>runDoc(false);el('docExport').onclick=()=>runDoc(true);el('docStop').onclick=()=>{stopDoc();el('docStatus').textContent='Stopped. Partial export may download.'};el('docSize').onchange=()=>drawDoc(0);drawDoc(0);
+async function runDoc(exporting){stopDoc();if(!images.length){el('docStatus').textContent='Upload at least one image.';return}drawDoc(0);let rec=null,voiceJob=null;const status=el('docStatus');if(exporting){try{const jobRecorder=await recorderFor(el('docCanvas'),'doc',()=>status.textContent='Documentary video downloaded!',e=>status.textContent=e);rec=jobRecorder.rec;voiceJob=jobRecorder;jobRecorder.start()}catch(e){status.textContent=e.message;return}}const duration=images.length*Number(el('docDuration').value),start=performance.now();el('docStop').disabled=false;el('docExport').disabled=true;docJob={rec,raf:0};const job=docJob;function frame(now){if(docJob!==job)return;const t=(now-start)/1000;drawDoc(t);if(t>=duration&&(!voiceJob||voiceJob.isSpeechDone()||t>=120)){stopDoc();if(!exporting)status.textContent='Preview finished.';return}job.raf=requestAnimationFrame(frame)}status.textContent=exporting?'Recording documentary...':'Preview playing...';job.raf=requestAnimationFrame(frame)}el('docPreview').onclick=()=>runDoc(false);el('docExport').onclick=()=>runDoc(true);el('docStop').onclick=()=>{stopDoc();el('docStatus').textContent='Stopped. Partial export may download.'};el('docSize').onchange=()=>drawDoc(0);drawDoc(0);
 })();
 </script>
 
