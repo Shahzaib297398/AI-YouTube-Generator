@@ -276,5 +276,156 @@ function stopVoice() {
   speechSynthesis.cancel();
 }
 </script>
+
+  
+<section id="video-editor" style="max-width:900px;margin:30px auto;padding:24px;background:#111827;color:white;border-radius:15px;font-family:Arial">
+  <h2>CreatorStudio Video Editor</h2>
+
+  <label>Video Format:</label>
+  <select id="editFormat" onchange="changeFormat()">
+    <option value="16/9">Long Video (16:9)</option>
+    <option value="9/16">YouTube Shorts (9:16)</option>
+  </select>
+
+  <p>Upload your video:</p>
+  <input type="file" id="videoUpload" accept="video/*">
+
+  <div style="margin:20px auto;max-width:100%;width:500px">
+    <video id="editPreview" controls playsinline
+      style="width:100%;aspect-ratio:16/9;background:black;object-fit:contain">
+    </video>
+  </div>
+
+  <h3>Video Timeline</h3>
+  <input id="timeline" type="range" min="0" max="100" value="0" style="width:100%">
+  <p id="timeDisplay">00:00 / 00:00</p>
+
+  <h3>Trim Video</h3>
+  <label>Start (seconds)</label>
+  <input id="trimStart" type="number" min="0" value="0">
+
+  <label>End (seconds)</label>
+  <input id="trimEnd" type="number" min="0" value="0">
+
+  <div style="margin-top:20px">
+    <button onclick="previewTrim()">Preview Trim</button>
+    <button onclick="exportTrim()">Export Video</button>
+  </div>
+  <p id="editorStatus"></p>
+</section>
+
+<script>
+const editVideo = document.getElementById("editPreview");
+const timeline = document.getElementById("timeline");
+const statusBox = document.getElementById("editorStatus");
+let videoURL = null;
+let stopAt = null;
+
+function changeFormat() {
+  editVideo.style.aspectRatio =
+    document.getElementById("editFormat").value;
+}
+
+document.getElementById("videoUpload").onchange = function(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  if (videoURL) URL.revokeObjectURL(videoURL);
+  videoURL = URL.createObjectURL(file);
+  editVideo.src = videoURL;
+  statusBox.textContent = "Video loaded!";
+};
+
+editVideo.onloadedmetadata = function() {
+  const d = editVideo.duration;
+  if (!Number.isFinite(d)) return;
+  timeline.max = d;
+  document.getElementById("trimEnd").value = d.toFixed(2);
+};
+
+editVideo.ontimeupdate = function() {
+  timeline.value = editVideo.currentTime;
+  document.getElementById("timeDisplay").textContent =
+    editVideo.currentTime.toFixed(1) + "s / " +
+    (editVideo.duration || 0).toFixed(1) + "s";
+  if (stopAt !== null && editVideo.currentTime >= stopAt) {
+    editVideo.pause();
+    stopAt = null;
+  }
+};
+
+timeline.oninput = function() {
+  editVideo.currentTime = Number(timeline.value);
+};
+
+async function previewTrim() {
+  if (!editVideo.src) return alert("Upload a video first.");
+  const start = Number(document.getElementById("trimStart").value);
+  const end = Number(document.getElementById("trimEnd").value);
+  if (!(start >= 0 && end > start && end <= editVideo.duration)) {
+    return alert("Check trim start and end.");
+  }
+  editVideo.pause();
+  editVideo.currentTime = start;
+  stopAt = end;
+  await editVideo.play();
+}
+
+async function exportTrim() {
+  if (!editVideo.src) return alert("Upload a video first.");
+  if (!editVideo.captureStream || !window.MediaRecorder) {
+    return alert("Export is not supported in this browser.");
+  }
+
+  const start = Number(document.getElementById("trimStart").value);
+  const end = Number(document.getElementById("trimEnd").value);
+  if (!(start >= 0 && end > start && end <= editVideo.duration)) {
+    return alert("Invalid trim range.");
+  }
+
+  statusBox.textContent = "Exporting... keep this tab open.";
+  editVideo.pause();
+  editVideo.currentTime = start;
+
+  const stream = editVideo.captureStream();
+  const chunks = [];
+  const type = MediaRecorder.isTypeSupported("video/webm")
+    ? "video/webm" : "";
+
+  const recorder = new MediaRecorder(stream,
+    type ? {mimeType:type} : undefined);
+
+  recorder.ondataavailable = e => {
+    if (e.data.size) chunks.push(e.data);
+  };
+
+  recorder.onstop = () => {
+    const blob = new Blob(chunks, {
+      type: recorder.mimeType || "video/webm"
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "creatorstudio-video.webm";
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+    statusBox.textContent = "Export finished!";
+  };
+
+  stopAt = null;
+  editVideo.currentTime = start;
+  editVideo.onseeked = async function() {
+    editVideo.onseeked = null;
+    recorder.start();
+    await editVideo.play();
+    const check = setInterval(() => {
+      if (editVideo.currentTime >= end || editVideo.ended) {
+        clearInterval(check);
+        editVideo.pause();
+        if (recorder.state !== "inactive") recorder.stop();
+      }
+    }, 100);
+  };
+}
+</script>
 </body>
 </html>
