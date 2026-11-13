@@ -449,6 +449,8 @@ async function exportTrim() {
   <div id="csShortControls">
     <div class="cs-grid"><div><label for="csStart">Start time (seconds)</label><input type="number" id="csStart" min="0" step="0.1" value="0"></div><div><label for="csLength">Clip duration (seconds)</label><select id="csLength"><option value="30">30 seconds</option><option value="45">45 seconds</option><option value="60">60 seconds</option></select></div></div>
     <label for="csCrop">Vertical framing</label><select id="csCrop"><option value="crop">Fill screen (center crop)</option><option value="fit">Fit full video (black bars)</option></select>
+    <label for="csQuality">Export video quality</label>
+    <select id="csQuality"><option value="720">720p HD (720 × 1280)</option><option value="1080">1080p Full HD (1080 × 1920)</option></select>
     <button type="button" id="csPreview">Preview selected clip</button><button type="button" id="csExport">Export vertical Short (WebM)</button><button type="button" id="csStop" disabled>Stop export</button>
     <canvas id="csCanvas" width="360" height="640"></canvas>
   </div>
@@ -459,7 +461,7 @@ async function exportTrim() {
     <pre id="csPlanOutput">Your long-video outline will appear here.</pre>
   </div>
   <p id="csStatus" role="status" aria-live="polite">Ready. For exports, keep this tab open; rendering takes real time.</p>
-  <p style="font-size:13px">Free browser tools. Export depends on browser support and may not include source audio. A 10–20 minute documentary needs additional original script, visuals and voiceover; this tool does not automatically invent or render those scenes.</p>
+  <p style="font-size:13px">Free browser tools. 720p/1080p exports may be slow on some devices. Upscaling does not improve low-resolution source detail. Export depends on browser support and may not include source audio. A 10–20 minute documentary needs additional original script, visuals and voiceover; this tool does not automatically invent or render those scenes.</p>
 </section>
 <script>
 (() => {
@@ -528,7 +530,7 @@ async function exportTrim() {
      }
      const mime=['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'].find(t=>MediaRecorder.isTypeSupported(t));
      if(!mime)throw Error('WebM export is not supported by this browser.');
-     const recorder=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:1800000});
+     const recorder=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:($('csQuality').value==='1080'?6500000:3500000)});
      const chunks=[];let finished=false;
      recording=recorder;$('csExport').disabled=true;$('csStop').disabled=false;
      recorder.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};
@@ -540,7 +542,7 @@ async function exportTrim() {
        recording=null;$('csExport').disabled=false;$('csStop').disabled=true;
        if(!chunks.length){status('Export failed: no video data recorded.');return}
        const blob=new Blob(chunks,{type:'video/webm'}),url=URL.createObjectURL(blob),a=document.createElement('a');
-       a.href=url;a.download='creatorstudio-short-vertical.webm';document.body.appendChild(a);a.click();a.remove();
+       a.href=url;a.download='creatorstudio-short-'+$('csQuality').value+'p.webm';document.body.appendChild(a);a.click();a.remove();
        setTimeout(()=>URL.revokeObjectURL(url),60000);status('Export downloaded! Check the WebM file and its audio.');
      };
      recorder.onerror=()=>{status('Recording error. Try a shorter clip.');finish()};
