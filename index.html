@@ -452,7 +452,7 @@ async function exportTrim() {
     <label for="csQuality">Export video quality</label>
     <select id="csQuality"><option value="720">720p HD (720 × 1280)</option><option value="1080">1080p Full HD (1080 × 1920)</option></select>
     <button type="button" id="csPreview">Preview selected clip</button><button type="button" id="csExport">Export vertical Short (WebM)</button><button type="button" id="csStop" disabled>Stop export</button>
-    <canvas id="csCanvas" width="360" height="640"></canvas>
+    <canvas id="csCanvas" width="720" height="1280" aria-label="Vertical video export preview"></canvas>
   </div>
   <div id="csLongControls" hidden>
     <label for="csTopic">Topic of your Short</label><input id="csTopic" placeholder="Example: Secrets of Ancient Egypt">
@@ -461,7 +461,7 @@ async function exportTrim() {
     <pre id="csPlanOutput">Your long-video outline will appear here.</pre>
   </div>
   <p id="csStatus" role="status" aria-live="polite">Ready. For exports, keep this tab open; rendering takes real time.</p>
-  <p style="font-size:13px">Free browser tools. 720p/1080p exports may be slow on some devices. Upscaling does not improve low-resolution source detail. Export depends on browser support and may not include source audio. A 10–20 minute documentary needs additional original script, visuals and voiceover; this tool does not automatically invent or render those scenes.</p>
+  <p style="font-size:13px">The selected export resolution controls the canvas recording size. Test the downloaded file to confirm browser encoding support. Free browser tools. 720p/1080p exports may be slow on some devices. Upscaling does not improve low-resolution source detail. Export depends on browser support and may not include source audio. A 10–20 minute documentary needs additional original script, visuals and voiceover; this tool does not automatically invent or render those scenes.</p>
 </section>
 <script>
 (() => {
