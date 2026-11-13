@@ -668,6 +668,7 @@ async function exportTrim() {
 <h2>🎞️ Documentary Video Maker</h2><p>Make a simple documentary slideshow from your own images and narration captions. Export a WebM video with optional uploaded narration and music.</p>
 <label for="docTitle">Documentary title</label><input id="docTitle" value="Ancient Egypt" maxlength="90"/>
 <label for="docSceneCount">Built-in illustrated scenes (no images needed)</label><select id="docSceneCount"><option value="4">4 scenes</option><option value="6" selected>6 scenes</option><option value="8">8 scenes</option></select><button type="button" id="docBuild">✨ Create Documentary Scenes + Voice Script</button><p>Creates editable illustrated scenes and a sample English narration. These are browser-drawn illustrations, not AI-generated photos. You can still upload your own images below to replace them.</p><label for="docImages">Optional: upload your own scene images (multiple)</label><input type="file" id="docImages" accept="image/*" multiple/>
+<div style="padding:16px;background:#10182a;border:1px solid #64748b;border-radius:12px;margin:14px 0"><h3 style="margin-top:0">📸 Automatic Real Documentary Photos (Free)</h3><p>Enter your topic above and click below. Searches Wikimedia Commons for reusable real photographs; these are <strong>not AI-generated</strong>. Review image licenses and attribution before publishing.</p><button type="button" id="docFindPhotos">🔎 Find Photos Automatically</button><p id="docPhotoStatus" role="status" aria-live="polite">No photos searched yet.</p><div id="docPhotoCredits" style="font-size:12px;line-height:1.6;overflow-wrap:anywhere"></div></div>
 <label for="docCaptions">Scene captions (one line per image, in order)</label><textarea id="docCaptions" rows="5" placeholder="The pyramids of Giza...&#10;The Nile shaped ancient life..."></textarea>
 <div class="two"><div><label for="docDuration">Seconds per image</label><select id="docDuration"><option value="3">3</option><option value="5" selected>5</option><option value="8">8</option><option value="10">10</option></select></div><div><label for="docSize">Export format</label><select id="docSize"><option value="wide">YouTube 16:9</option><option value="vertical">Shorts 9:16</option></select></div></div>
 <label for="docNarration">Automatic English voiceover script</label><textarea id="docNarration" rows="4" placeholder="Example: Ancient Egypt was home to remarkable pyramids and pharaohs."></textarea><p>For automatic voice: Chrome → This Tab → Share tab audio. No separate audio file needed.</p><label for="docAudio">Voiceover audio (optional: WebM, MP3, WAV)</label><input type="file" id="docAudio" accept="audio/*,.webm"/><label for="docMusic">Background music (optional)</label><input type="file" id="docMusic" accept="audio/*,.webm"/><canvas id="docCanvas" width="1280" height="720"></canvas><div><button id="docPreview">Preview</button><button id="docExport">Export Documentary WebM</button><button id="docStop" disabled>Stop</button></div><p id="docStatus" role="status">Click Create Documentary Scenes to begin.</p>
@@ -739,7 +740,53 @@ async function recorderFor(canvas,prefix,onDone,onFail){
 function drawStick(t){const c=el('stickCanvas'),ctx=c.getContext('2d'),W=c.width,H=c.height,move=el('stickMove').value,bg=el('stickBg').value;ctx.fillStyle=bg==='light'?'#f8fafc':bg==='blue'?'#164e83':'#0f172a';ctx.fillRect(0,0,W,H);const dark=bg==='light';ctx.strokeStyle=dark?'#111827':'#f8fafc';ctx.fillStyle=ctx.strokeStyle;ctx.lineWidth=12;ctx.lineCap='round';const phase=t*2*Math.PI,shift=move==='walk'?Math.sin(t*.9)*W*.22:0,jump=move==='jump'?Math.abs(Math.sin(phase*.8))*125:0,bob=move==='dance'?Math.sin(phase*1.5)*20:0,x=W/2+shift,y=H*.53-jump+bob;ctx.beginPath();ctx.arc(x,y-125,40,0,Math.PI*2);ctx.stroke();function line(x1,y1,x2,y2){ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke()}line(x,y-85,x,y+85);const swing=Math.sin(phase*1.7)*65;line(x,y-40,x-95,y+(move==='wave'? -80:move==='walk'?swing:-15));line(x,y-40,x+95,y+(move==='wave'?-90+Math.sin(phase*2)*40:move==='walk'?-swing:move==='dance'?Math.sin(phase)*80:-15));line(x,y+85,x-65+(move==='walk'?swing:move==='dance'?Math.sin(phase)*40:0),y+205);line(x,y+85,x+65-(move==='walk'?swing:move==='dance'?Math.sin(phase)*40:0),y+205);ctx.strokeStyle=dark?'#64748b':'#94a3b8';ctx.lineWidth=4;line(0,H*.86,W,H*.86);text(ctx,el('stickCaption').value,W/2,80,W-100,48)}
 let stickJob=null;function stopStick(){if(!stickJob)return;cancelAnimationFrame(stickJob.raf);if(stickJob.rec&&stickJob.rec.state!=='inactive')stickJob.rec.stop();stickJob=null;el('stickStop').disabled=true;el('stickExport').disabled=false}
 async function runStick(exporting){stopStick();const seconds=Number(el('stickSeconds').value),start=performance.now(),status=el('stickStatus');let rec=null,voiceJob=null;if(exporting){try{const jobRecorder=await recorderFor(el('stickCanvas'),'stick',()=>status.textContent='Stickman video downloaded!',e=>status.textContent=e);rec=jobRecorder.rec;voiceJob=jobRecorder;jobRecorder.start()}catch(e){status.textContent=e.message;return}}el('stickStop').disabled=false;el('stickExport').disabled=true;stickJob={rec,raf:0};const job=stickJob;function frame(now){if(stickJob!==job)return;const t=(now-start)/1000;drawStick(t);if(t>=seconds&&(!voiceJob||voiceJob.isSpeechDone()||t>=120)){stopStick();if(!exporting)status.textContent='Preview finished.';return}job.raf=requestAnimationFrame(frame)}status.textContent=exporting?'Recording stickman video...':'Preview playing...';job.raf=requestAnimationFrame(frame)}el('stickPreview').onclick=()=>runStick(false);el('stickExport').onclick=()=>runStick(true);el('stickStop').onclick=()=>{stopStick();el('stickStatus').textContent='Stopped. Partial export may download.'};drawStick(0);
-let images=[],urls=[],docJob=null;el('docImages').onchange=async e=>{stopDoc();urls.forEach(URL.revokeObjectURL);urls=[];images=[];const files=[...e.target.files].filter(f=>f.type.startsWith('image/')).slice(0,60);for(const f of files){const url=URL.createObjectURL(f);urls.push(url);try{const img=new Image();img.src=url;await img.decode();images.push(img)}catch(_){}}el('docStatus').textContent=images.length+' image(s) ready.';drawDoc(0)};
+let images=[],urls=[],docJob=null;
+// Wikimedia Commons provides real licensed media, not AI-generated imagery.
+const photoButton=el('docFindPhotos');
+photoButton.addEventListener('click',async()=>{
+ const topic=el('docTitle').value.trim();
+ const count=Number(el('docSceneCount').value);
+ const status=el('docPhotoStatus'),credits=el('docPhotoCredits');
+ if(!topic){status.textContent='Enter a documentary title first.';return}
+ if(docJob){status.textContent='Stop preview/export before loading photos.';return}
+ photoButton.disabled=true;credits.replaceChildren();status.textContent='Searching real photos for '+topic+'...';
+ const found=[];const seen=new Set();
+ try{
+  const terms=[topic,topic+' history',topic+' landscape',topic+' architecture'];
+  for(const term of terms){
+   if(found.length>=count)break;
+   const qs=new URLSearchParams({action:'query',generator:'search',gsrsearch:'filetype:bitmap '+term,gsrnamespace:'6',gsrlimit:'30',prop:'imageinfo',iiprop:'url|mime|extmetadata',iiurlwidth:'1400',format:'json',origin:'*'});
+   const response=await fetch('https://commons.wikimedia.org/w/api.php?'+qs);
+   if(!response.ok)throw Error('Photo search service unavailable');
+   const data=await response.json();
+   for(const page of Object.values(data.query?.pages||{})){
+    const info=page.imageinfo?.[0];if(!info||!/^image\/(jpeg|png|webp)$/.test(info.mime)||seen.has(page.title))continue;
+    const license=info.extmetadata?.LicenseShortName?.value||'Check license';
+    const licenseUrl=info.extmetadata?.LicenseUrl?.value||'';
+    const allowed=/CC BY|CC0|public domain|PD/i.test(license);
+    if(!allowed)continue;
+    seen.add(page.title);found.push({url:info.thumburl||info.url,title:page.title,license,licenseUrl,source:info.descriptionurl});
+    if(found.length>=count)break;
+   }
+  }
+  if(!found.length)throw Error('No compatible photos found. Try a simpler topic, like Ancient Egypt.');
+  const loaded=[];
+  for(const item of found){
+   try{const img=new Image();img.crossOrigin='anonymous';img.src=item.url;await img.decode();loaded.push({img,item})}catch(_){}
+  }
+  if(!loaded.length)throw Error('Photos found, but browser could not load them. Try again.');
+  stopDoc();urls.forEach(URL.revokeObjectURL);urls=[];images=loaded.map(x=>x.img);
+  el('docImages').value='';
+  for(const {item} of loaded){
+   const line=document.createElement('div');
+   const link=document.createElement('a');link.href=item.source;link.target='_blank';link.rel='noopener noreferrer';link.textContent=item.title.replace(/^File:/,'');link.style.color='#c4b5fd';
+   line.append(link,document.createTextNode(' — '+item.license+' (Wikimedia Commons)'));credits.appendChild(line);
+  }
+  if(!el('docCaptions').value.trim())el('docCaptions').value=loaded.map((_,i)=>topic+' — scene '+(i+1)).join('\n');
+  drawDoc(0);status.textContent=loaded.length+' real photos ready! Click Preview. Keep credits for attribution.';
+ }catch(err){status.textContent='Could not load photos: '+err.message}
+ finally{photoButton.disabled=false}
+});el('docImages').onchange=async e=>{stopDoc();urls.forEach(URL.revokeObjectURL);urls=[];images=[];const files=[...e.target.files].filter(f=>f.type.startsWith('image/')).slice(0,60);for(const f of files){const url=URL.createObjectURL(f);urls.push(url);try{const img=new Image();img.src=url;await img.decode();images.push(img)}catch(_){}}el('docStatus').textContent=images.length+' image(s) ready.';drawDoc(0)};
 function drawIllustration(ctx,W,H,idx,total){
  const themes=[['#152d50','#4676aa'],['#2a274a','#a47754'],['#183f43','#3c8e89'],['#3d2c47','#8a6c9e'],['#223c38','#77975c'],['#392d38','#b28b58']];
  const [top,bottom]=themes[idx%themes.length];const grad=ctx.createLinearGradient(0,0,0,H);grad.addColorStop(0,top);grad.addColorStop(1,bottom);ctx.fillStyle=grad;ctx.fillRect(0,0,W,H);
