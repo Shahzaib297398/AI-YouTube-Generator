@@ -219,7 +219,6 @@ function makeScript() {
     "CONCLUSION:\nSummarize the story and invite viewers to subscribe.";
 }
 </script>
-</body>
   
 <section style="max-width:900px;margin:30px auto;padding:24px;background:#1e293b;color:white;border-radius:15px;font-family:Arial">
   <h2>AI Voiceover Studio</h2>
@@ -427,5 +426,157 @@ async function exportTrim() {
   };
 }
 </script>
+
+<style>
+.cs-convert{max-width:900px;margin:32px auto;padding:24px;background:#192238;color:#f8fafc;border:1px solid #475575;border-radius:18px;font-family:Arial,sans-serif}
+.cs-convert h2{margin-top:0}.cs-convert p{color:#cbd5e1;line-height:1.55}
+.cs-convert input,.cs-convert select,.cs-convert textarea{box-sizing:border-box;width:100%;padding:11px;margin:6px 0 14px;background:#10182a;border:1px solid #64748b;border-radius:8px;color:white;font-size:15px}
+.cs-convert label{display:block;margin-top:8px;margin-bottom:2px}
+.cs-convert button{padding:12px 16px;margin:6px 6px 6px 0;background:#7c3aed;color:white;border-radius:9px}
+.cs-convert button:disabled{opacity:.5;cursor:not-allowed}.cs-convert .cs-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+.cs-convert video{display:block;max-width:100%;max-height:280px;margin:10px auto;background:black}
+.cs-convert canvas{display:block;max-width:100%;max-height:330px;margin:12px auto;background:black}
+.cs-convert pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#0b1222;border-radius:10px;padding:15px;line-height:1.5}
+</style>
+<section class="cs-convert" id="shorts-converter">
+  <h2>🎬 Shorts ↔ Long Video Studio</h2>
+  <p><strong>Long → Short:</strong> Upload a video, choose a 30–60 second segment, crop to 9:16 and export WebM. <strong>Short → Long:</strong> Create a chapter-by-chapter expansion plan; add new footage and narration separately.</p>
+  <label for="csMode">Choose conversion</label>
+  <select id="csMode"><option value="longshort">Long Video → YouTube Short</option><option value="shortlong">YouTube Short → Long Video Plan</option></select>
+  <label for="csFile">Upload your video (stays in your browser)</label>
+  <input type="file" id="csFile" accept="video/*">
+  <video id="csSource" controls playsinline preload="metadata"></video>
+  <div id="csShortControls">
+    <div class="cs-grid"><div><label for="csStart">Start time (seconds)</label><input type="number" id="csStart" min="0" step="0.1" value="0"></div><div><label for="csLength">Clip duration (seconds)</label><select id="csLength"><option value="30">30 seconds</option><option value="45">45 seconds</option><option value="60">60 seconds</option></select></div></div>
+    <label for="csCrop">Vertical framing</label><select id="csCrop"><option value="crop">Fill screen (center crop)</option><option value="fit">Fit full video (black bars)</option></select>
+    <button type="button" id="csPreview">Preview selected clip</button><button type="button" id="csExport">Export vertical Short (WebM)</button><button type="button" id="csStop" disabled>Stop export</button>
+    <canvas id="csCanvas" width="360" height="640"></canvas>
+  </div>
+  <div id="csLongControls" hidden>
+    <label for="csTopic">Topic of your Short</label><input id="csTopic" placeholder="Example: Secrets of Ancient Egypt">
+    <label for="csMinutes">Target long-video duration</label><select id="csMinutes"><option value="10">10 minutes</option><option value="15">15 minutes</option><option value="20">20 minutes</option></select>
+    <button type="button" id="csPlan">Create expansion plan</button><button type="button" id="csDownloadPlan">Download plan (.txt)</button>
+    <pre id="csPlanOutput">Your long-video outline will appear here.</pre>
+  </div>
+  <p id="csStatus" role="status" aria-live="polite">Ready. For exports, keep this tab open; rendering takes real time.</p>
+  <p style="font-size:13px">Free browser tools. Export depends on browser support and may not include source audio. A 10–20 minute documentary needs additional original script, visuals and voiceover; this tool does not automatically invent or render those scenes.</p>
+</section>
+<script>
+(() => {
+ const $=id=>document.getElementById(id);
+ const video=$('csSource'), canvas=$('csCanvas'), ctx=canvas.getContext('2d');
+ let sourceUrl=null, recording=null, raf=0, stopPreview=null, planText='';
+ const status=msg=>{$('csStatus').textContent=msg};
+ $('csMode').addEventListener('change',()=>{
+   const short=$('csMode').value==='longshort';
+   $('csShortControls').hidden=!short;$('csLongControls').hidden=short;
+ });
+ $('csFile').addEventListener('change',e=>{
+   if(recording){status('Stop exporting before changing files.');return}
+   const f=e.target.files[0];if(!f)return;
+   if(sourceUrl)URL.revokeObjectURL(sourceUrl);
+   sourceUrl=URL.createObjectURL(f);video.src=sourceUrl;video.load();
+   status('Loaded '+f.name+'. Select your conversion mode.');
+ });
+ function bounds(){
+   if(!video.src||!Number.isFinite(video.duration)||video.duration<=0)throw Error('Upload a supported video and wait for it to load.');
+   const start=Number($('csStart').value),length=Number($('csLength').value);
+   if(!Number.isFinite(start)||start<0||start>=video.duration)throw Error('Choose a valid start time.');
+   const end=Math.min(video.duration,start+length);
+   if(end-start<1)throw Error('Clip is too short.');
+   return {start,end};
+ }
+ function draw(){
+   ctx.fillStyle='#000';ctx.fillRect(0,0,canvas.width,canvas.height);
+   if(video.readyState>=2&&video.videoWidth){
+     const w=video.videoWidth,h=video.videoHeight,W=canvas.width,H=canvas.height;
+     const scale=$('csCrop').value==='crop'?Math.max(W/w,H/h):Math.min(W/w,H/h);
+     const dw=w*scale,dh=h*scale;
+     ctx.drawImage(video,(W-dw)/2,(H-dh)/2,dw,dh);
+   }
+ }
+ function renderLoop(){draw();raf=requestAnimationFrame(renderLoop)}
+ function stopLoop(){cancelAnimationFrame(raf);raf=0;draw()}
+ async function seek(t){
+   video.pause();
+   if(Math.abs(video.currentTime-t)<.06){draw();return}
+   await new Promise((resolve,reject)=>{
+     const done=()=>{video.removeEventListener('seeked',done);video.removeEventListener('error',fail);resolve()};
+     const fail=()=>{video.removeEventListener('seeked',done);video.removeEventListener('error',fail);reject(Error('Could not seek video'))};
+     video.addEventListener('seeked',done,{once:true});video.addEventListener('error',fail,{once:true});video.currentTime=t;
+   });draw();
+ }
+ $('csPreview').addEventListener('click',async()=>{
+   try{
+     const {start,end}=bounds();if(recording)throw Error('Export already running.');
+     if(stopPreview){video.removeEventListener('timeupdate',stopPreview);stopPreview=null}
+     await seek(start);stopPreview=()=>{if(video.currentTime>=end){video.pause();video.removeEventListener('timeupdate',stopPreview);stopPreview=null;stopLoop();status('Preview finished.')}};
+     video.addEventListener('timeupdate',stopPreview);renderLoop();await video.play();status('Previewing selected clip.');
+   }catch(e){status(e.message)}
+ });
+ $('csExport').addEventListener('click',async()=>{
+   try{
+     if(recording)throw Error('Already exporting.');
+     const {start,end}=bounds();
+     if(!canvas.captureStream||!window.MediaRecorder)throw Error('Your browser cannot export canvas video. Try desktop Chrome.');
+     if(stopPreview){video.removeEventListener('timeupdate',stopPreview);stopPreview=null}
+     video.pause();stopLoop();await seek(start);draw();
+     const stream=canvas.captureStream(30);
+     // Attach source audio when supported; otherwise export a silent clip.
+     if(typeof video.captureStream==='function'){
+       try{const sourceStream=video.captureStream();sourceStream.getAudioTracks().forEach(track=>stream.addTrack(track))}catch(e){}
+     }
+     const mime=['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'].find(t=>MediaRecorder.isTypeSupported(t));
+     if(!mime)throw Error('WebM export is not supported by this browser.');
+     const recorder=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:1800000});
+     const chunks=[];let finished=false;
+     recording=recorder;$('csExport').disabled=true;$('csStop').disabled=false;
+     recorder.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};
+     const finish=()=>{if(finished)return;finished=true;video.pause();stopLoop();if(recorder.state!=='inactive')recorder.stop()};
+     const tick=()=>{if(video.currentTime>=end||video.ended)finish()};
+     video.addEventListener('timeupdate',tick);
+     recorder.onstop=()=>{
+       video.removeEventListener('timeupdate',tick);stream.getTracks().forEach(t=>t.stop());
+       recording=null;$('csExport').disabled=false;$('csStop').disabled=true;
+       if(!chunks.length){status('Export failed: no video data recorded.');return}
+       const blob=new Blob(chunks,{type:'video/webm'}),url=URL.createObjectURL(blob),a=document.createElement('a');
+       a.href=url;a.download='creatorstudio-short-vertical.webm';document.body.appendChild(a);a.click();a.remove();
+       setTimeout(()=>URL.revokeObjectURL(url),60000);status('Export downloaded! Check the WebM file and its audio.');
+     };
+     recorder.onerror=()=>{status('Recording error. Try a shorter clip.');finish()};
+     $('csStop').onclick=finish;
+     recorder.start(1000);renderLoop();await video.play();status('Exporting vertical video in real time. Keep this tab open.');
+   }catch(e){status(e.message);if(recording&&recording.state!=='inactive')recording.stop();stopLoop()}
+ });
+ $('csPlan').addEventListener('click',()=>{
+   const topic=$('csTopic').value.trim()||'Your video topic';
+   const minutes=Number($('csMinutes').value);
+   const chapters=[
+     ['Opening hook','Set up a compelling question, show a teaser and explain the promise.'],
+     ['Background','Introduce the history, people, context and essential definitions.'],
+     ['Key story','Explain the main events with new facts and examples.'],
+     ['Deep dive','Add evidence, detailed explanations and original visuals.'],
+     ['Surprises','Explore overlooked details and common misconceptions.'],
+     ['Conclusion','Summarize takeaways and connect back to the hook.']
+   ];
+   const secs=minutes*60;let elapsed=0;
+   const lines=['LONG VIDEO EXPANSION PLAN','Topic: '+topic,'Target: '+minutes+' minutes','Note: This is a planning template, not an AI-generated factual script.',''];
+   chapters.forEach(([name,desc],i)=>{
+     const next=i===chapters.length-1?secs:Math.round(secs*(i+1)/chapters.length);
+     const fmt=n=>String(Math.floor(n/60)).padStart(2,'0')+':'+String(n%60).padStart(2,'0');
+     lines.push(fmt(elapsed)+'–'+fmt(next)+' | '+name,desc,'Script prompt: Write original narration about '+topic+' for this section.','Visuals: Add new footage, B-roll, titles and relevant images.','');elapsed=next;
+   });
+   lines.push('NEXT STEPS: Research facts, write a full script, record narration, collect licensed visuals, and assemble in a video editor.');
+   planText=lines.join('\n');$('csPlanOutput').textContent=planText;status('Expansion plan created.');
+ });
+ $('csDownloadPlan').addEventListener('click',()=>{
+   if(!planText){status('Create a plan first.');return}
+   const url=URL.createObjectURL(new Blob([planText],{type:'text/plain;charset=utf-8'}));
+   const a=document.createElement('a');a.href=url;a.download='short-to-long-plan.txt';a.click();setTimeout(()=>URL.revokeObjectURL(url),30000);
+ });
+ video.addEventListener('loadeddata',draw);
+})();
+</script>
+
 </body>
 </html>
