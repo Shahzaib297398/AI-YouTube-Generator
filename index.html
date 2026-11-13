@@ -523,6 +523,11 @@ async function exportTrim() {
      if(!canvas.captureStream||!window.MediaRecorder)throw Error('Your browser cannot export canvas video. Try desktop Chrome.');
      if(stopPreview){video.removeEventListener('timeupdate',stopPreview);stopPreview=null}
      video.pause();stopLoop();await seek(start);draw();
+     // Set the actual recording dimensions BEFORE captureStream.
+     const quality = Number($('csQuality').value);
+     canvas.width = quality === 1080 ? 1080 : 720;
+     canvas.height = quality === 1080 ? 1920 : 1280;
+     draw();
      const stream=canvas.captureStream(30);
      // Attach source audio when supported; otherwise export a silent clip.
      if(typeof video.captureStream==='function'){
@@ -542,12 +547,12 @@ async function exportTrim() {
        recording=null;$('csExport').disabled=false;$('csStop').disabled=true;
        if(!chunks.length){status('Export failed: no video data recorded.');return}
        const blob=new Blob(chunks,{type:'video/webm'}),url=URL.createObjectURL(blob),a=document.createElement('a');
-       a.href=url;a.download='creatorstudio-short-'+$('csQuality').value+'p.webm';document.body.appendChild(a);a.click();a.remove();
+       a.href=url;a.download='creatorstudio-short-'+quality+'p.webm';document.body.appendChild(a);a.click();a.remove();
        setTimeout(()=>URL.revokeObjectURL(url),60000);status('Export downloaded! Check the WebM file and its audio.');
      };
      recorder.onerror=()=>{status('Recording error. Try a shorter clip.');finish()};
      $('csStop').onclick=finish;
-     recorder.start(1000);renderLoop();await video.play();status('Exporting vertical video in real time. Keep this tab open.');
+     recorder.start(1000);renderLoop();await video.play();status('Exporting '+quality+'p ('+canvas.width+' × '+canvas.height+'). Keep this tab open.');
    }catch(e){status(e.message);if(recording&&recording.state!=='inactive')recording.stop();stopLoop()}
  });
  $('csPlan').addEventListener('click',()=>{
