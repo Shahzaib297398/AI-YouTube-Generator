@@ -191,5 +191,33 @@ function generateIdeas() {
 document.getElementById("generate")
   .addEventListener("click", generateIdeas);
 </script>
+
+  
+<section id="script-generator" style="max-width:900px;margin:30px auto;padding:24px;background:#1e293b;color:white;border-radius:15px;font-family:Arial">
+  <h2>AI YouTube Script Generator</h2>
+  <p>Enter a topic to create a video script outline.</p>
+  <input id="scriptTopic" placeholder="Example: Ancient Egypt" style="width:100%;padding:12px;margin:10px 0;color:#111">
+  <button onclick="makeScript()" style="padding:12px 20px;cursor:pointer">Generate Script</button>
+  <pre id="scriptOutput" style="white-space:pre-wrap;line-height:1.7"></pre>
+</section>
+
+<script>
+function makeScript() {
+  const topic = document.getElementById("scriptTopic").value.trim();
+  const output = document.getElementById("scriptOutput");
+  if (!topic) {
+    output.textContent = "Please enter a topic first.";
+    return;
+  }
+  output.textContent =
+    "VIDEO TITLE: " + topic + "\n\n" +
+    "HOOK:\nWhat if everything you knew about " + topic + " was only half the story?\n\n" +
+    "INTRODUCTION:\nToday we explore " + topic + " and discover why it matters.\n\n" +
+    "CHAPTER 1: Background\nExplain the history and context.\n\n" +
+    "CHAPTER 2: Key Facts\nPresent important information and examples.\n\n" +
+    "CHAPTER 3: Surprising Details\nShare interesting discoveries.\n\n" +
+    "CONCLUSION:\nSummarize the story and invite viewers to subscribe.";
+}
+</script>
 </body>
 </html>
