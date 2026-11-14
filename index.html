@@ -683,24 +683,36 @@ let freeVoiceReady=null;
 async function loadFreeVoice(){
  if(freeVoiceReady)return freeVoiceReady;
  freeVoiceReady=(async()=>{
-  const base='https://cdn.jsdelivr.net/npm/mespeak@2.0.2/';
-  if(!window.meSpeak){
-   await new Promise((resolve,reject)=>{
-    const script=document.createElement('script');script.src=base+'src/mespeak.js';
-    script.onload=resolve;script.onerror=()=>reject(Error('Free voice library could not load. Check internet connection.'));
-    document.head.appendChild(script);
-   });
+  // The old npm URL used mespeak@2.0.2/src/mespeak.js, which is not a dependable published asset.
+  // Try the original meSpeak GitHub distribution via independent CDN mirrors.
+  const bases=[
+   'https://cdn.jsdelivr.net/gh/mespeak/mespeak@master/',
+   'https://raw.githack.com/mespeak/mespeak/master/',
+   'https://mespeak.github.io/mespeak/'
+  ];
+  const loadScript=url=>new Promise((resolve,reject)=>{
+   const script=document.createElement('script');script.src=url;
+   script.onload=()=>window.meSpeak?resolve():reject(Error('Voice script loaded without meSpeak'));
+   script.onerror=()=>reject(Error('Voice script blocked or missing'));
+   document.head.appendChild(script);
+  });
+  let lastError;
+  for(const base of bases){
+   try{
+    if(!window.meSpeak)await loadScript(base+'mespeak.js');
+    const getJson=async path=>{
+     const response=await fetch(base+path,{mode:'cors'});
+     if(!response.ok)throw Error(path+' returned HTTP '+response.status);
+     return await response.json();
+    };
+    if(!meSpeak.isConfigLoaded())meSpeak.loadConfig(await getJson('mespeak_config.json'));
+    if(!meSpeak.isVoiceLoaded())meSpeak.loadVoice(await getJson('voices/en/en-us.json'));
+    if(meSpeak.isConfigLoaded()&&meSpeak.isVoiceLoaded())return;
+    throw Error('Voice configuration did not initialize');
+   }catch(err){lastError=err;console.warn('Voice engine source failed:',base,err)}
   }
-  if(!window.meSpeak)throw Error('Free voice engine unavailable.');
-  const getJson=async path=>{
-   const response=await fetch(base+path);
-   if(!response.ok)throw Error('Free voice files unavailable ('+response.status+').');
-   return response.json();
-  };
-  if(!meSpeak.isConfigLoaded())meSpeak.loadConfig(await getJson('src/mespeak_config.json'));
-  if(!meSpeak.isVoiceLoaded())meSpeak.loadVoice(await getJson('voices/en/en-us.json'));
-  if(!meSpeak.isConfigLoaded()||!meSpeak.isVoiceLoaded())throw Error('Could not initialize English voice.');
- })().catch(e=>{freeVoiceReady=null;throw e});
+  throw Error('Free voice library unavailable from all mirrors. '+(lastError?.message||'')+' Try uploading a WAV/MP3 voiceover instead.');
+ })().catch(err=>{freeVoiceReady=null;throw err});
  return freeVoiceReady;
 }
 function speechChunks(text,max=260){
