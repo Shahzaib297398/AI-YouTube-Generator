@@ -662,7 +662,7 @@ async function exportTrim() {
 <h2>🕺 Stickman Animation Maker</h2><p>Create a free animated stickman clip. Choose movement, caption and length, then export a WebM video with optional uploaded narration and music.</p>
 <div class="two"><div><label for="stickMove">Movement</label><select id="stickMove"><option value="walk">Walking</option><option value="wave">Waving</option><option value="jump">Jumping</option><option value="dance">Dancing</option></select></div><div><label for="stickBg">Background</label><select id="stickBg"><option value="light">White</option><option value="dark">Dark</option><option value="blue">Blue</option></select></div><div><label for="stickSeconds">Duration</label><select id="stickSeconds"><option value="5">5 seconds</option><option value="10">10 seconds</option><option value="15">15 seconds</option><option value="30">30 seconds</option></select></div></div>
 <label for="stickCaption">Caption</label><input id="stickCaption" maxlength="90" value="My Stickman Story"/>
-<label for="stickNarration">Automatic English voiceover script</label><textarea id="stickNarration" rows="3" placeholder="Example: Once upon a time, a stickman started walking."></textarea><p>For automatic voice: Chrome → This Tab → Share tab audio. No separate audio file needed.</p><label for="stickAudio">Voiceover audio (optional: WebM, MP3, WAV)</label><input type="file" id="stickAudio" accept="audio/*,.webm"/><label for="stickMusic">Background music (optional)</label><input type="file" id="stickMusic" accept="audio/*,.webm"/><canvas id="stickCanvas" width="1280" height="720"></canvas><div><button id="stickPreview">Preview</button><button id="stickExport">Export Stickman WebM</button><button id="stickStop" disabled>Stop</button></div><p id="stickStatus" role="status">Ready.</p>
+<label for="stickNarration">Automatic English voiceover script</label><textarea id="stickNarration" rows="3" placeholder="Example: Once upon a time, a stickman started walking."></textarea><p>Free automatic English voice is generated as audio and included in the downloaded WebM. No tab sharing or API key. Internet required to load the free robotic voice engine.</p><label for="stickAudio">Voiceover audio (optional: WebM, MP3, WAV)</label><input type="file" id="stickAudio" accept="audio/*,.webm"/><label for="stickMusic">Background music (optional)</label><input type="file" id="stickMusic" accept="audio/*,.webm"/><canvas id="stickCanvas" width="1280" height="720"></canvas><div><button id="stickPreview">Preview</button><button id="stickExport">Export Stickman WebM</button><button id="stickStop" disabled>Stop</button></div><p id="stickStatus" role="status">Ready.</p>
 </section>
 <section class="maker" id="documentary-maker">
 <h2>🎞️ Documentary Video Maker</h2><p>Make a simple documentary slideshow from your own images and narration captions. Export a WebM video with optional uploaded narration and music.</p>
@@ -671,80 +671,128 @@ async function exportTrim() {
 <div style="padding:16px;background:#10182a;border:1px solid #64748b;border-radius:12px;margin:14px 0"><h3 style="margin-top:0">📸 Automatic Real Documentary Photos (Free)</h3><p>Enter your topic above and click below. Searches Wikimedia Commons for reusable real photographs; these are <strong>not AI-generated</strong>. Review image licenses and attribution before publishing.</p><button type="button" id="docFindPhotos">🔎 Find Photos Automatically</button><p id="docPhotoStatus" role="status" aria-live="polite">No photos searched yet.</p><div id="docPhotoCredits" style="font-size:12px;line-height:1.6;overflow-wrap:anywhere"></div></div>
 <label for="docCaptions">Scene captions (one line per image, in order)</label><textarea id="docCaptions" rows="5" placeholder="The pyramids of Giza...&#10;The Nile shaped ancient life..."></textarea>
 <div class="two"><div><label for="docDuration">Seconds per image</label><select id="docDuration"><option value="3">3</option><option value="5" selected>5</option><option value="8">8</option><option value="10">10</option></select></div><div><label for="docSize">Export format</label><select id="docSize"><option value="wide">YouTube 16:9</option><option value="vertical">Shorts 9:16</option></select></div></div>
-<label for="docNarration">Automatic English voiceover script</label><textarea id="docNarration" rows="4" placeholder="Example: Ancient Egypt was home to remarkable pyramids and pharaohs."></textarea><p>For automatic voice: Chrome → This Tab → Share tab audio. No separate audio file needed.</p><label for="docAudio">Voiceover audio (optional: WebM, MP3, WAV)</label><input type="file" id="docAudio" accept="audio/*,.webm"/><label for="docMusic">Background music (optional)</label><input type="file" id="docMusic" accept="audio/*,.webm"/><canvas id="docCanvas" width="1280" height="720"></canvas><div><button id="docPreview">Preview</button><button id="docExport">Export Documentary WebM</button><button id="docStop" disabled>Stop</button></div><p id="docStatus" role="status">Click Create Documentary Scenes to begin.</p>
+<label for="docNarration">Automatic English voiceover script</label><textarea id="docNarration" rows="4" placeholder="Example: Ancient Egypt was home to remarkable pyramids and pharaohs."></textarea><p>Free automatic English voice is generated as audio and included in the downloaded WebM. No tab sharing or API key. Internet required to load the free robotic voice engine.</p><label for="docAudio">Voiceover audio (optional: WebM, MP3, WAV)</label><input type="file" id="docAudio" accept="audio/*,.webm"/><label for="docMusic">Background music (optional)</label><input type="file" id="docMusic" accept="audio/*,.webm"/><canvas id="docCanvas" width="1280" height="720"></canvas><div><button id="docPreview">Preview</button><button id="docExport">Export Documentary WebM</button><button id="docStop" disabled>Stop</button></div><p id="docStatus" role="status">Click Create Documentary Scenes to begin.</p>
 </section>
 <script>
 (()=>{
 const el=id=>document.getElementById(id);
 function text(ctx,str,x,y,maxWidth,fontSize=42){ctx.fillStyle='#fff';ctx.font='bold '+fontSize+'px Arial';ctx.textAlign='center';ctx.shadowColor='rgba(0,0,0,.9)';ctx.shadowBlur=12;ctx.fillText(str.slice(0,95),x,y,maxWidth);ctx.shadowBlur=0;}
+// Free client-side English TTS (meSpeak / eSpeak, GPL). No API key and no tab capture.
+// The library and its voice files are loaded from a public CDN at export time.
+let freeVoiceReady=null;
+async function loadFreeVoice(){
+ if(freeVoiceReady)return freeVoiceReady;
+ freeVoiceReady=(async()=>{
+  const base='https://cdn.jsdelivr.net/npm/mespeak@2.0.2/';
+  if(!window.meSpeak){
+   await new Promise((resolve,reject)=>{
+    const script=document.createElement('script');script.src=base+'src/mespeak.js';
+    script.onload=resolve;script.onerror=()=>reject(Error('Free voice library could not load. Check internet connection.'));
+    document.head.appendChild(script);
+   });
+  }
+  if(!window.meSpeak)throw Error('Free voice engine unavailable.');
+  const getJson=async path=>{
+   const response=await fetch(base+path);
+   if(!response.ok)throw Error('Free voice files unavailable ('+response.status+').');
+   return response.json();
+  };
+  if(!meSpeak.isConfigLoaded())meSpeak.loadConfig(await getJson('src/mespeak_config.json'));
+  if(!meSpeak.isVoiceLoaded())meSpeak.loadVoice(await getJson('voices/en/en-us.json'));
+  if(!meSpeak.isConfigLoaded()||!meSpeak.isVoiceLoaded())throw Error('Could not initialize English voice.');
+ })().catch(e=>{freeVoiceReady=null;throw e});
+ return freeVoiceReady;
+}
+function speechChunks(text,max=260){
+ const words=text.replace(/\s+/g,' ').trim().split(' '),chunks=[];
+ let part='';
+ for(const word of words){
+  if(part && (part.length+word.length+1>max)){chunks.push(part);part='';}
+  part+=(part?' ':'')+word;
+ }
+ if(part)chunks.push(part);
+ return chunks;
+}
+async function createSpeechBuffer(ctx,text){
+ await loadFreeVoice();
+ const chunks=speechChunks(text);
+ if(!chunks.length)throw Error('Please enter narration text.');
+ const decoded=[];
+ for(const chunk of chunks){
+  const wav=meSpeak.speak(chunk,{rawdata:true,speed:165,amplitude:100});
+  if(!wav)throw Error('Free voice could not generate audio.');
+  const bytes=wav instanceof ArrayBuffer?wav:wav.buffer.slice(wav.byteOffset,wav.byteOffset+wav.byteLength);
+  decoded.push(await ctx.decodeAudioData(bytes.slice(0)));
+ }
+ const rate=ctx.sampleRate,channels=Math.max(...decoded.map(b=>b.numberOfChannels));
+ const frames=decoded.reduce((n,b)=>n+Math.ceil(b.duration*rate),0);
+ const result=ctx.createBuffer(channels,frames,rate);
+ let offset=0;
+ for(const b of decoded){
+  const size=Math.ceil(b.duration*rate);
+  for(let ch=0;ch<channels;ch++){
+   const src=b.getChannelData(Math.min(ch,b.numberOfChannels-1));
+   const dst=result.getChannelData(ch);
+   for(let i=0;i<size;i++)dst[offset+i]=src[Math.min(src.length-1,Math.floor(i*b.sampleRate/rate))]||0;
+  }
+  offset+=size;
+ }
+ return result;
+}
 async function recorderFor(canvas,prefix,onDone,onFail){
  if(!canvas.captureStream||!window.MediaRecorder)throw Error('Use desktop Chrome for WebM export.');
  const mime=['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'].find(x=>MediaRecorder.isTypeSupported(x));
  if(!mime)throw Error('WebM not supported.');
- // Documentary exports use manually requested frames, preventing Chrome from
-  // recording only the first image when tab capture throttles animation.
-  const manualFrames = prefix === 'doc';
-  const stream=canvas.captureStream(30),parts=[];
-  const videoTrack=stream.getVideoTracks()[0];
-  const pushFrame=()=>{if(manualFrames && videoTrack && typeof videoTrack.requestFrame==='function')videoTrack.requestFrame();};
- let audioCtx=null,sources=[],display=null;
+ const stream=canvas.captureStream(30),parts=[];
+ const videoTrack=stream.getVideoTracks()[0];
+ const pushFrame=()=>{if(prefix==='doc'&&videoTrack&&typeof videoTrack.requestFrame==='function')videoTrack.requestFrame();};
+ let audioCtx=null,sources=[];
  const narration=el(prefix+'Narration').value.trim();
- if(narration && el(prefix+'Audio').files.length)throw Error('Use either automatic narration or an uploaded voiceover, not both.');
+ if(narration&&el(prefix+'Audio').files.length)throw Error('Use either automatic narration or an uploaded voiceover, not both.');
  const voice=el(prefix+'Audio').files[0],music=el(prefix+'Music').files[0];
- try {
-  if(voice||music){
+ try{
+  let voiceDuration=0;
+  if(narration||voice||music){
    audioCtx=new (window.AudioContext||window.webkitAudioContext)();
    await audioCtx.resume();
    const dest=audioCtx.createMediaStreamDestination();
-   for(const [file,volume,loop] of [[voice,1,false],[music,.17,true]]){
-    if(!file)continue;
-    const buffer=await audioCtx.decodeAudioData(await file.arrayBuffer());
+   let voiceBuffer=null;
+   if(narration)voiceBuffer=await createSpeechBuffer(audioCtx,narration);
+   else if(voice)voiceBuffer=await audioCtx.decodeAudioData(await voice.arrayBuffer());
+   if(voiceBuffer){
+    voiceDuration=voiceBuffer.duration;
     const source=audioCtx.createBufferSource(),gain=audioCtx.createGain();
-    source.buffer=buffer;source.loop=loop;gain.gain.value=volume;
+    source.buffer=voiceBuffer;gain.gain.value=1;
+    source.connect(gain);gain.connect(dest);sources.push(source);
+   }
+   if(music){
+    const buffer=await audioCtx.decodeAudioData(await music.arrayBuffer());
+    const source=audioCtx.createBufferSource(),gain=audioCtx.createGain();
+    source.buffer=buffer;source.loop=true;gain.gain.value=.17;
     source.connect(gain);gain.connect(dest);sources.push(source);
    }
    dest.stream.getAudioTracks().forEach(track=>stream.addTrack(track));
-  }
-  if(narration){
-   if(!navigator.mediaDevices?.getDisplayMedia || !('speechSynthesis' in window))throw Error('Automatic voice needs desktop Chrome with tab audio sharing.');
-   display=await navigator.mediaDevices.getDisplayMedia({video:true,audio:true});
-   const tracks=display.getAudioTracks();
-   if(!tracks.length)throw Error('No tab audio. Select This Tab and enable Share tab audio.');
-   // Capture the tab's audio, including speech synthesis when Chrome routes it there.
-   if(audioCtx){
-    const source=audioCtx.createMediaStreamSource(new MediaStream(tracks));
-    const destination=audioCtx.createMediaStreamDestination();
-    source.connect(destination);
-    destination.stream.getAudioTracks().forEach(track=>stream.addTrack(track));
-   }else tracks.forEach(track=>stream.addTrack(track));
   }
   const rec=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:3500000});
   rec.ondataavailable=e=>{if(e.data.size)parts.push(e.data)};
   rec.onstop=()=>{
    sources.forEach(source=>{try{source.stop()}catch(_){}});
-   stream.getTracks().forEach(t=>t.stop());if(display)display.getTracks().forEach(t=>t.stop());if(audioCtx)audioCtx.close();
+   stream.getTracks().forEach(t=>t.stop());
+   if(audioCtx)audioCtx.close();
    if(!parts.length){onFail('No video data captured.');return}
    const blob=new Blob(parts,{type:'video/webm'}),url=URL.createObjectURL(blob),a=document.createElement('a');
    a.href=url;a.download=prefix==='stick'?'stickman-animation.webm':'documentary-video.webm';
    document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);onDone();
   };
   rec.onerror=()=>onFail('Recording failed.');
-  let speechDone=!narration;
-  return {rec,pushFrame,hasNarration:!!narration,isSpeechDone:()=>speechDone,start(){
+  return {rec,pushFrame,voiceDuration,start(){
    rec.start(500);sources.forEach(source=>source.start(0));
-   if(narration){
-    speechSynthesis.cancel();
-    const utterance=new SpeechSynthesisUtterance(narration);
-    utterance.lang='en-US';utterance.rate=1;
-    utterance.onend=()=>{speechDone=true};utterance.onerror=()=>{speechDone=true};
-    speechSynthesis.speak(utterance);
-   }
   }};
- }catch(e){stream.getTracks().forEach(t=>t.stop());if(display)display.getTracks().forEach(t=>t.stop());if(audioCtx)audioCtx.close();throw e}
+ }catch(e){stream.getTracks().forEach(t=>t.stop());if(audioCtx)audioCtx.close();throw e}
 }
 function drawStick(t){const c=el('stickCanvas'),ctx=c.getContext('2d'),W=c.width,H=c.height,move=el('stickMove').value,bg=el('stickBg').value;ctx.fillStyle=bg==='light'?'#f8fafc':bg==='blue'?'#164e83':'#0f172a';ctx.fillRect(0,0,W,H);const dark=bg==='light';ctx.strokeStyle=dark?'#111827':'#f8fafc';ctx.fillStyle=ctx.strokeStyle;ctx.lineWidth=12;ctx.lineCap='round';const phase=t*2*Math.PI,shift=move==='walk'?Math.sin(t*.9)*W*.22:0,jump=move==='jump'?Math.abs(Math.sin(phase*.8))*125:0,bob=move==='dance'?Math.sin(phase*1.5)*20:0,x=W/2+shift,y=H*.53-jump+bob;ctx.beginPath();ctx.arc(x,y-125,40,0,Math.PI*2);ctx.stroke();function line(x1,y1,x2,y2){ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke()}line(x,y-85,x,y+85);const swing=Math.sin(phase*1.7)*65;line(x,y-40,x-95,y+(move==='wave'? -80:move==='walk'?swing:-15));line(x,y-40,x+95,y+(move==='wave'?-90+Math.sin(phase*2)*40:move==='walk'?-swing:move==='dance'?Math.sin(phase)*80:-15));line(x,y+85,x-65+(move==='walk'?swing:move==='dance'?Math.sin(phase)*40:0),y+205);line(x,y+85,x+65-(move==='walk'?swing:move==='dance'?Math.sin(phase)*40:0),y+205);ctx.strokeStyle=dark?'#64748b':'#94a3b8';ctx.lineWidth=4;line(0,H*.86,W,H*.86);text(ctx,el('stickCaption').value,W/2,80,W-100,48)}
 let stickJob=null;function stopStick(){if(!stickJob)return;cancelAnimationFrame(stickJob.raf);if(stickJob.rec&&stickJob.rec.state!=='inactive')stickJob.rec.stop();stickJob=null;el('stickStop').disabled=true;el('stickExport').disabled=false}
-async function runStick(exporting){stopStick();const seconds=Number(el('stickSeconds').value),start=performance.now(),status=el('stickStatus');let rec=null,voiceJob=null;if(exporting){try{const jobRecorder=await recorderFor(el('stickCanvas'),'stick',()=>status.textContent='Stickman video downloaded!',e=>status.textContent=e);rec=jobRecorder.rec;voiceJob=jobRecorder;jobRecorder.start()}catch(e){status.textContent=e.message;return}}el('stickStop').disabled=false;el('stickExport').disabled=true;stickJob={rec,raf:0};const job=stickJob;function frame(now){if(stickJob!==job)return;const t=(now-start)/1000;drawStick(t);if(t>=seconds&&(!voiceJob||voiceJob.isSpeechDone()||t>=120)){stopStick();if(!exporting)status.textContent='Preview finished.';return}job.raf=requestAnimationFrame(frame)}status.textContent=exporting?'Recording stickman video...':'Preview playing...';job.raf=requestAnimationFrame(frame)}el('stickPreview').onclick=()=>runStick(false);el('stickExport').onclick=()=>runStick(true);el('stickStop').onclick=()=>{stopStick();el('stickStatus').textContent='Stopped. Partial export may download.'};drawStick(0);
+async function runStick(exporting){stopStick();const seconds=Number(el('stickSeconds').value),start=performance.now(),status=el('stickStatus');let rec=null,voiceJob=null;if(exporting){try{const jobRecorder=await recorderFor(el('stickCanvas'),'stick',()=>status.textContent='Stickman video downloaded!',e=>status.textContent=e);rec=jobRecorder.rec;voiceJob=jobRecorder;jobRecorder.start()}catch(e){status.textContent=e.message;return}}el('stickStop').disabled=false;el('stickExport').disabled=true;stickJob={rec,raf:0};const job=stickJob;function frame(now){if(stickJob!==job)return;const t=(now-start)/1000;drawStick(t);if(t>=Math.max(seconds,voiceJob?.voiceDuration||0)){stopStick();if(!exporting)status.textContent='Preview finished.';return}job.raf=requestAnimationFrame(frame)}status.textContent=exporting?'Recording stickman video...':'Preview playing...';job.raf=requestAnimationFrame(frame)}el('stickPreview').onclick=()=>runStick(false);el('stickExport').onclick=()=>runStick(true);el('stickStop').onclick=()=>{stopStick();el('stickStatus').textContent='Stopped. Partial export may download.'};drawStick(0);
 let images=[],urls=[],docJob=null;
 // Wikimedia Commons provides real licensed media, not AI-generated imagery.
 const photoButton=el('docFindPhotos');
@@ -845,7 +893,7 @@ async function runDoc(exporting){
    lastScene=scene;
    status.textContent=(exporting?'Recording':'Previewing')+' scene '+scene+' of '+count+' ('+Math.floor(t)+'s / '+duration+'s)';
   }
-  if(t>=duration&&(!voiceJob||voiceJob.isSpeechDone()||t>=120)){
+  if(t>=Math.max(duration,voiceJob?.voiceDuration||0)){
    stopDoc();if(!exporting)status.textContent='Preview finished.';
   }
  }
