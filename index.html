@@ -662,7 +662,7 @@ async function exportTrim() {
 <h2>🕺 Stickman Animation Maker</h2><p>Create a free animated stickman clip. Choose movement, caption and length, then export a WebM video with optional uploaded narration and music.</p>
 <div class="two"><div><label for="stickMove">Movement</label><select id="stickMove"><option value="walk">Walking</option><option value="wave">Waving</option><option value="jump">Jumping</option><option value="dance">Dancing</option></select></div><div><label for="stickBg">Background</label><select id="stickBg"><option value="light">White</option><option value="dark">Dark</option><option value="blue">Blue</option></select></div><div><label for="stickSeconds">Duration</label><select id="stickSeconds"><option value="5">5 seconds</option><option value="10">10 seconds</option><option value="15">15 seconds</option><option value="30">30 seconds</option></select></div></div>
 <label for="stickCaption">Caption</label><input id="stickCaption" maxlength="90" value="My Stickman Story"/>
-<label for="stickNarration">Automatic English voiceover script</label><textarea id="stickNarration" rows="3" placeholder="Example: Once upon a time, a stickman started walking."></textarea><p>Free automatic English voice is generated as audio and included in the downloaded WebM. No tab sharing or API key. Internet required to load the free robotic voice engine.</p><label for="stickAudio">Voiceover audio (optional: WebM, MP3, WAV)</label><input type="file" id="stickAudio" accept="audio/*,.webm"/><label for="stickMusic">Background music (optional)</label><input type="file" id="stickMusic" accept="audio/*,.webm"/><canvas id="stickCanvas" width="1280" height="720"></canvas><div><button id="stickPreview">Preview</button><button id="stickExport">Export Stickman WebM</button><button id="stickStop" disabled>Stop</button></div><p id="stickStatus" role="status">Ready.</p>
+<label for="stickNarration">Automatic English voiceover script</label><textarea id="stickNarration" rows="3" placeholder="Example: Once upon a time, a stickman started walking."></textarea><p>Experimental automatic voice requires the meSpeak library, which may be unavailable. For reliable audio export, use an uploaded audio file or the documentary microphone recorder below.</p><label for="stickAudio">Voiceover audio (optional: WebM, MP3, WAV)</label><input type="file" id="stickAudio" accept="audio/*,.webm"/><label for="stickMusic">Background music (optional)</label><input type="file" id="stickMusic" accept="audio/*,.webm"/><canvas id="stickCanvas" width="1280" height="720"></canvas><div><button id="stickPreview">Preview</button><button id="stickExport">Export Stickman WebM</button><button id="stickStop" disabled>Stop</button></div><p id="stickStatus" role="status">Ready.</p>
 </section>
 <section class="maker" id="documentary-maker">
 <h2>🎞️ Documentary Video Maker</h2><p>Make a simple documentary slideshow from your own images and narration captions. Export a WebM video with optional uploaded narration and music.</p>
@@ -671,7 +671,7 @@ async function exportTrim() {
 <div style="padding:16px;background:#10182a;border:1px solid #64748b;border-radius:12px;margin:14px 0"><h3 style="margin-top:0">📸 Automatic Real Documentary Photos (Free)</h3><p>Enter your topic above and click below. Searches Wikimedia Commons for reusable real photographs; these are <strong>not AI-generated</strong>. Review image licenses and attribution before publishing.</p><button type="button" id="docFindPhotos">🔎 Find Photos Automatically</button><p id="docPhotoStatus" role="status" aria-live="polite">No photos searched yet.</p><div id="docPhotoCredits" style="font-size:12px;line-height:1.6;overflow-wrap:anywhere"></div></div>
 <label for="docCaptions">Scene captions (one line per image, in order)</label><textarea id="docCaptions" rows="5" placeholder="The pyramids of Giza...&#10;The Nile shaped ancient life..."></textarea>
 <div class="two"><div><label for="docDuration">Seconds per image</label><select id="docDuration"><option value="3">3</option><option value="5" selected>5</option><option value="8">8</option><option value="10">10</option></select></div><div><label for="docSize">Export format</label><select id="docSize"><option value="wide">YouTube 16:9</option><option value="vertical">Shorts 9:16</option></select></div></div>
-<label for="docNarration">Automatic English voiceover script</label><textarea id="docNarration" rows="4" placeholder="Example: Ancient Egypt was home to remarkable pyramids and pharaohs."></textarea><p>Free automatic English voice is generated as audio and included in the downloaded WebM. No tab sharing or API key. Internet required to load the free robotic voice engine.</p><label for="docAudio">Voiceover audio (optional: WebM, MP3, WAV)</label><input type="file" id="docAudio" accept="audio/*,.webm"/><label for="docMusic">Background music (optional)</label><input type="file" id="docMusic" accept="audio/*,.webm"/><canvas id="docCanvas" width="1280" height="720"></canvas><div><button id="docPreview">Preview</button><button id="docExport">Export Documentary WebM</button><button id="docStop" disabled>Stop</button></div><p id="docStatus" role="status">Click Create Documentary Scenes to begin.</p>
+<label for="docNarration">Automatic English voiceover script</label><textarea id="docNarration" rows="4" placeholder="Example: Ancient Egypt was home to remarkable pyramids and pharaohs."></textarea><p>Experimental automatic voice requires the meSpeak library, which may be unavailable. For reliable audio export, use an uploaded audio file or the documentary microphone recorder below.</p><div style="background:#0f172a;border:1px solid #64748b;padding:14px;border-radius:12px;margin:12px 0"><strong>🎙️ Reliable free voice recording</strong><p>Record your narration here, or upload an MP3/WAV. Recorded audio will be included directly in the exported documentary. Browser automatic voice preview cannot be captured reliably without a working TTS engine.</p><button type="button" id="docMicStart">Start microphone recording</button><button type="button" id="docMicStop" disabled>Stop recording</button><button type="button" id="docMicClear" disabled>Clear recording</button><audio id="docMicPreview" controls style="display:none;width:100%;margin-top:12px"></audio><p id="docMicStatus" role="status">No microphone recording yet.</p></div><label for="docAudio">Voiceover audio (optional: WebM, MP3, WAV)</label><input type="file" id="docAudio" accept="audio/*,.webm"/><label for="docMusic">Background music (optional)</label><input type="file" id="docMusic" accept="audio/*,.webm"/><canvas id="docCanvas" width="1280" height="720"></canvas><div><button id="docPreview">Preview</button><button id="docExport">Export Documentary WebM</button><button id="docStop" disabled>Stop</button></div><p id="docStatus" role="status">Click Create Documentary Scenes to begin.</p>
 </section>
 <script>
 (()=>{
@@ -751,6 +751,31 @@ async function createSpeechBuffer(ctx,text){
  }
  return result;
 }
+let docRecordedAudio=null, docMicRecorder=null, docMicStream=null, docMicParts=[], docMicUrl=null;
+const micStatus=el('docMicStatus');
+el('docMicStart').onclick=async()=>{
+ try{
+  if(docMicRecorder) return;
+  if(!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder)throw Error('Microphone recording requires Chrome on HTTPS.');
+  docMicStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true}});
+  const mime=['audio/webm;codecs=opus','audio/webm'].find(t=>MediaRecorder.isTypeSupported(t));
+  docMicParts=[];docMicRecorder=new MediaRecorder(docMicStream,mime?{mimeType:mime}:undefined);
+  docMicRecorder.ondataavailable=e=>{if(e.data.size)docMicParts.push(e.data)};
+  docMicRecorder.onstop=()=>{
+   docMicStream?.getTracks().forEach(t=>t.stop());docMicStream=null;docMicRecorder=null;
+   docRecordedAudio=new Blob(docMicParts,{type:mime||'audio/webm'});
+   if(docMicUrl)URL.revokeObjectURL(docMicUrl);
+   docMicUrl=URL.createObjectURL(docRecordedAudio);
+   const player=el('docMicPreview');player.src=docMicUrl;player.style.display='block';
+   el('docMicStart').disabled=false;el('docMicStop').disabled=true;el('docMicClear').disabled=false;
+   micStatus.textContent='Recording ready. Play it to check, then export documentary. Clear automatic narration text first.';
+  };
+  docMicRecorder.start();el('docMicStart').disabled=true;el('docMicStop').disabled=false;
+  micStatus.textContent='Recording microphone... speak now.';
+ }catch(e){docMicStream?.getTracks().forEach(t=>t.stop());docMicStream=null;micStatus.textContent='Microphone error: '+e.message}
+};
+el('docMicStop').onclick=()=>{if(docMicRecorder?.state==='recording')docMicRecorder.stop()};
+el('docMicClear').onclick=()=>{docRecordedAudio=null;if(docMicUrl)URL.revokeObjectURL(docMicUrl);docMicUrl=null;el('docMicPreview').style.display='none';el('docMicPreview').removeAttribute('src');el('docMicClear').disabled=true;micStatus.textContent='Recording cleared.'};
 async function recorderFor(canvas,prefix,onDone,onFail){
  if(!canvas.captureStream||!window.MediaRecorder)throw Error('Use desktop Chrome for WebM export.');
  const mime=['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'].find(x=>MediaRecorder.isTypeSupported(x));
@@ -762,15 +787,18 @@ async function recorderFor(canvas,prefix,onDone,onFail){
  const narration=el(prefix+'Narration').value.trim();
  if(narration&&el(prefix+'Audio').files.length)throw Error('Use either automatic narration or an uploaded voiceover, not both.');
  const voice=el(prefix+'Audio').files[0],music=el(prefix+'Music').files[0];
+  const micBlob=prefix==='doc'?docRecordedAudio:null;
+  if(micBlob&&voice)throw Error('Choose either microphone recording or uploaded voiceover, not both.');
+  if(micBlob&&narration)throw Error('Clear Automatic English voiceover script before using microphone recording.');
  try{
   let voiceDuration=0;
-  if(narration||voice||music){
+  if(narration||voice||micBlob||music){
    audioCtx=new (window.AudioContext||window.webkitAudioContext)();
    await audioCtx.resume();
    const dest=audioCtx.createMediaStreamDestination();
    let voiceBuffer=null;
    if(narration)voiceBuffer=await createSpeechBuffer(audioCtx,narration);
-   else if(voice)voiceBuffer=await audioCtx.decodeAudioData(await voice.arrayBuffer());
+   else if(voice||micBlob)voiceBuffer=await audioCtx.decodeAudioData(await (voice||micBlob).arrayBuffer());
    if(voiceBuffer){
     voiceDuration=voiceBuffer.duration;
     const source=audioCtx.createBufferSource(),gain=audioCtx.createGain();
@@ -882,7 +910,7 @@ async function runDoc(exporting){
  if(exporting){
   try{
    voiceJob=await recorderFor(el('docCanvas'),'doc',
-    ()=>status.textContent='Documentary video downloaded! Check all scenes.',
+    ()=>status.textContent='Documentary downloaded! Check the voice in the file.',
     e=>status.textContent=e);
    rec=voiceJob.rec;
   }catch(e){status.textContent=e.message;return}
