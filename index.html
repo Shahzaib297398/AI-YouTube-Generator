@@ -684,7 +684,7 @@ async function recorderFor(canvas,prefix,onDone,onFail){
  // Documentary exports use manually requested frames, preventing Chrome from
   // recording only the first image when tab capture throttles animation.
   const manualFrames = prefix === 'doc';
-  const stream=canvas.captureStream(manualFrames ? 0 : 30),parts=[];
+  const stream=canvas.captureStream(30),parts=[];
   const videoTrack=stream.getVideoTracks()[0];
   const pushFrame=()=>{if(manualFrames && videoTrack && typeof videoTrack.requestFrame==='function')videoTrack.requestFrame();};
  let audioCtx=null,sources=[],display=null;
@@ -804,12 +804,21 @@ function drawIllustration(ctx,W,H,idx,total){
 function drawDoc(t){const c=el('docCanvas'),ctx=c.getContext('2d'),wide=el('docSize').value==='wide';if(c.width!==(wide?1280:720)){c.width=wide?1280:720;c.height=wide?720:1280}const W=c.width,H=c.height;ctx.fillStyle='#0b1222';ctx.fillRect(0,0,W,H);const count=images.length||Number(el('docSceneCount').value);const per=Number(el('docDuration').value),idx=Math.min(count-1,Math.floor(t/per));if(images.length){const img=images[idx],scale=Math.max(W/img.width,H/img.height),w=img.width*scale,h=img.height*scale;ctx.save();ctx.translate(W/2,H/2);const zoom=1+.04*((t%per)/per);ctx.scale(zoom,zoom);ctx.drawImage(img,-w/2,-h/2,w,h);ctx.restore()}else{drawIllustration(ctx,W,H,idx,count)}ctx.fillStyle='rgba(0,0,0,.58)';ctx.fillRect(0,H-180,W,180);text(ctx,el('docTitle').value,W/2,65,W-40,wide?42:34);const captions=el('docCaptions').value.split('\n');text(ctx,captions[idx]||'Scene '+(idx+1),W/2,H-95,W-35,wide?36:30);text(ctx,(idx+1)+' / '+count,W/2,H-35,W-35,22)}
 el('docBuild').onclick=()=>{const title=el('docTitle').value.trim()||'My Documentary';const count=Number(el('docSceneCount').value);const chapters=['The story begins','Discover the background','Meet the important people','Explore the turning point','See what changed','Understand the legacy','Discover surprising details','What we can learn'];const captions=chapters.slice(0,count).map(x=>x+' — '+title);el('docCaptions').value=captions.join('\n');el('docNarration').value=captions.map((x,i)=>'Scene '+(i+1)+'. '+x+'. Here is another part of our story.').join(' ');drawDoc(0);el('docStatus').textContent=count+' illustrated scenes and editable sample narration ready. Replace placeholder text with researched facts before publishing.'};
 
-function stopDoc(){if(!docJob)return;cancelAnimationFrame(docJob.raf);if(docJob.rec&&docJob.rec.state!=='inactive')docJob.rec.stop();docJob=null;el('docStop').disabled=true;el('docExport').disabled=false}
+function stopDoc(){
+ if(!docJob)return;
+ const job=docJob;docJob=null;
+ if(job.timer)clearInterval(job.timer);
+ if(job.raf)cancelAnimationFrame(job.raf);
+ if(job.rec&&job.rec.state!=='inactive')job.rec.stop();
+ el('docStop').disabled=true;el('docExport').disabled=false;
+}
 async function runDoc(exporting){
  stopDoc();drawDoc(0);
  const status=el('docStatus');
- const duration=(images.length||Number(el('docSceneCount').value))*Number(el('docDuration').value);
- let rec=null,voiceJob=null;
+ const count=images.length||Number(el('docSceneCount').value);
+ const per=Number(el('docDuration').value);
+ const duration=count*per;
+ let voiceJob=null,rec=null;
  if(exporting){
   try{
    voiceJob=await recorderFor(el('docCanvas'),'doc',
@@ -819,25 +828,29 @@ async function runDoc(exporting){
   }catch(e){status.textContent=e.message;return}
  }
  el('docStop').disabled=false;el('docExport').disabled=true;
- docJob={rec,raf:0};const job=docJob;
- // Start the animation clock AFTER tab sharing permissions are complete.
- const start=performance.now();let lastScene=-1;
- if(exporting){voiceJob.start();voiceJob.pushFrame();}
- function frame(now){
+ const job={rec,timer:null,raf:0};docJob=job;
+ // Record on a regular timer instead of relying only on requestAnimationFrame.
+ // This is important when Chrome opens the screen/tab sharing UI.
+ const started=performance.now();let lastScene=0;
+ if(exporting)voiceJob.start();
+ function tick(){
   if(docJob!==job)return;
-  const t=(now-start)/1000;
-  drawDoc(t);
-  // Force a fresh encoded video frame for every visual update, even if Chrome
-  // throttles canvas.captureStream while the sharing dialog was open.
-  if(exporting)voiceJob.pushFrame();
-  const scene=Math.min((images.length||Number(el('docSceneCount').value)),Math.floor(t/Number(el('docDuration').value))+1);
-  if(scene!==lastScene){lastScene=scene;status.textContent=(exporting?'Recording':'Previewing')+' scene '+scene+' of '+(images.length||Number(el('docSceneCount').value))+'...';}
-  if(t>=duration&&(!voiceJob||voiceJob.isSpeechDone()||t>=120)){
-   stopDoc();if(!exporting)status.textContent='Preview finished.';return;
+  const t=(performance.now()-started)/1000;
+  try{
+   drawDoc(Math.min(t,Math.max(0,duration-.001)));
+   if(exporting)voiceJob.pushFrame();
+  }catch(err){status.textContent='Frame error: '+err.message;stopDoc();return}
+  const scene=Math.min(count,Math.floor(t/per)+1);
+  if(scene!==lastScene){
+   lastScene=scene;
+   status.textContent=(exporting?'Recording':'Previewing')+' scene '+scene+' of '+count+' ('+Math.floor(t)+'s / '+duration+'s)';
   }
-  job.raf=requestAnimationFrame(frame);
+  if(t>=duration&&(!voiceJob||voiceJob.isSpeechDone()||t>=120)){
+   stopDoc();if(!exporting)status.textContent='Preview finished.';
+  }
  }
- job.raf=requestAnimationFrame(frame);
+ tick();
+ if(docJob===job)job.timer=setInterval(tick,100);
 }
 el('docPreview').onclick=()=>runDoc(false);el('docExport').onclick=()=>runDoc(true);el('docStop').onclick=()=>{stopDoc();el('docStatus').textContent='Stopped. Partial export may download.'};el('docSize').onchange=()=>drawDoc(0);el('docSceneCount').onchange=()=>drawDoc(0);drawDoc(0);
 })();
