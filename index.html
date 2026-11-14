@@ -681,7 +681,12 @@ async function recorderFor(canvas,prefix,onDone,onFail){
  if(!canvas.captureStream||!window.MediaRecorder)throw Error('Use desktop Chrome for WebM export.');
  const mime=['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'].find(x=>MediaRecorder.isTypeSupported(x));
  if(!mime)throw Error('WebM not supported.');
- const stream=canvas.captureStream(30),parts=[];
+ // Documentary exports use manually requested frames, preventing Chrome from
+  // recording only the first image when tab capture throttles animation.
+  const manualFrames = prefix === 'doc';
+  const stream=canvas.captureStream(manualFrames ? 0 : 30),parts=[];
+  const videoTrack=stream.getVideoTracks()[0];
+  const pushFrame=()=>{if(manualFrames && videoTrack && typeof videoTrack.requestFrame==='function')videoTrack.requestFrame();};
  let audioCtx=null,sources=[],display=null;
  const narration=el(prefix+'Narration').value.trim();
  if(narration && el(prefix+'Audio').files.length)throw Error('Use either automatic narration or an uploaded voiceover, not both.');
@@ -725,7 +730,7 @@ async function recorderFor(canvas,prefix,onDone,onFail){
   };
   rec.onerror=()=>onFail('Recording failed.');
   let speechDone=!narration;
-  return {rec,hasNarration:!!narration,isSpeechDone:()=>speechDone,start(){
+  return {rec,pushFrame,hasNarration:!!narration,isSpeechDone:()=>speechDone,start(){
    rec.start(500);sources.forEach(source=>source.start(0));
    if(narration){
     speechSynthesis.cancel();
@@ -800,7 +805,41 @@ function drawDoc(t){const c=el('docCanvas'),ctx=c.getContext('2d'),wide=el('docS
 el('docBuild').onclick=()=>{const title=el('docTitle').value.trim()||'My Documentary';const count=Number(el('docSceneCount').value);const chapters=['The story begins','Discover the background','Meet the important people','Explore the turning point','See what changed','Understand the legacy','Discover surprising details','What we can learn'];const captions=chapters.slice(0,count).map(x=>x+' — '+title);el('docCaptions').value=captions.join('\n');el('docNarration').value=captions.map((x,i)=>'Scene '+(i+1)+'. '+x+'. Here is another part of our story.').join(' ');drawDoc(0);el('docStatus').textContent=count+' illustrated scenes and editable sample narration ready. Replace placeholder text with researched facts before publishing.'};
 
 function stopDoc(){if(!docJob)return;cancelAnimationFrame(docJob.raf);if(docJob.rec&&docJob.rec.state!=='inactive')docJob.rec.stop();docJob=null;el('docStop').disabled=true;el('docExport').disabled=false}
-async function runDoc(exporting){stopDoc();drawDoc(0);let rec=null,voiceJob=null;const status=el('docStatus');if(exporting){try{const jobRecorder=await recorderFor(el('docCanvas'),'doc',()=>status.textContent='Documentary video downloaded!',e=>status.textContent=e);rec=jobRecorder.rec;voiceJob=jobRecorder;jobRecorder.start()}catch(e){status.textContent=e.message;return}}const duration=(images.length||Number(el('docSceneCount').value))*Number(el('docDuration').value),start=performance.now();el('docStop').disabled=false;el('docExport').disabled=true;docJob={rec,raf:0};const job=docJob;function frame(now){if(docJob!==job)return;const t=(now-start)/1000;drawDoc(t);if(t>=duration&&(!voiceJob||voiceJob.isSpeechDone()||t>=120)){stopDoc();if(!exporting)status.textContent='Preview finished.';return}job.raf=requestAnimationFrame(frame)}status.textContent=exporting?'Recording documentary...':'Preview playing...';job.raf=requestAnimationFrame(frame)}el('docPreview').onclick=()=>runDoc(false);el('docExport').onclick=()=>runDoc(true);el('docStop').onclick=()=>{stopDoc();el('docStatus').textContent='Stopped. Partial export may download.'};el('docSize').onchange=()=>drawDoc(0);el('docSceneCount').onchange=()=>drawDoc(0);drawDoc(0);
+async function runDoc(exporting){
+ stopDoc();drawDoc(0);
+ const status=el('docStatus');
+ const duration=(images.length||Number(el('docSceneCount').value))*Number(el('docDuration').value);
+ let rec=null,voiceJob=null;
+ if(exporting){
+  try{
+   voiceJob=await recorderFor(el('docCanvas'),'doc',
+    ()=>status.textContent='Documentary video downloaded! Check all scenes.',
+    e=>status.textContent=e);
+   rec=voiceJob.rec;
+  }catch(e){status.textContent=e.message;return}
+ }
+ el('docStop').disabled=false;el('docExport').disabled=true;
+ docJob={rec,raf:0};const job=docJob;
+ // Start the animation clock AFTER tab sharing permissions are complete.
+ const start=performance.now();let lastScene=-1;
+ if(exporting){voiceJob.start();voiceJob.pushFrame();}
+ function frame(now){
+  if(docJob!==job)return;
+  const t=(now-start)/1000;
+  drawDoc(t);
+  // Force a fresh encoded video frame for every visual update, even if Chrome
+  // throttles canvas.captureStream while the sharing dialog was open.
+  if(exporting)voiceJob.pushFrame();
+  const scene=Math.min((images.length||Number(el('docSceneCount').value)),Math.floor(t/Number(el('docDuration').value))+1);
+  if(scene!==lastScene){lastScene=scene;status.textContent=(exporting?'Recording':'Previewing')+' scene '+scene+' of '+(images.length||Number(el('docSceneCount').value))+'...';}
+  if(t>=duration&&(!voiceJob||voiceJob.isSpeechDone()||t>=120)){
+   stopDoc();if(!exporting)status.textContent='Preview finished.';return;
+  }
+  job.raf=requestAnimationFrame(frame);
+ }
+ job.raf=requestAnimationFrame(frame);
+}
+el('docPreview').onclick=()=>runDoc(false);el('docExport').onclick=()=>runDoc(true);el('docStop').onclick=()=>{stopDoc();el('docStatus').textContent='Stopped. Partial export may download.'};el('docSize').onchange=()=>drawDoc(0);el('docSceneCount').onchange=()=>drawDoc(0);drawDoc(0);
 })();
 </script>
 
