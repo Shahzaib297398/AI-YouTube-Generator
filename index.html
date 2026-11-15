@@ -671,7 +671,7 @@ async function exportTrim() {
 <div style="padding:16px;background:#10182a;border:1px solid #64748b;border-radius:12px;margin:14px 0"><h3 style="margin-top:0">📸 Automatic Real Documentary Photos (Free)</h3><p>Enter your topic above and click below. Searches Wikimedia Commons for reusable real photographs; these are <strong>not AI-generated</strong>. Review image licenses and attribution before publishing.</p><button type="button" id="docFindPhotos">🔎 Find Photos Automatically</button><p id="docPhotoStatus" role="status" aria-live="polite">No photos searched yet.</p><div id="docPhotoCredits" style="font-size:12px;line-height:1.6;overflow-wrap:anywhere"></div></div>
 <label for="docCaptions">Scene captions (one line per image, in order)</label><textarea id="docCaptions" rows="5" placeholder="The pyramids of Giza...&#10;The Nile shaped ancient life..."></textarea>
 <div class="two"><div><label for="docDuration">Seconds per image</label><select id="docDuration"><option value="3">3</option><option value="5" selected>5</option><option value="8">8</option><option value="10">10</option></select></div><div><label for="docSize">Export format</label><select id="docSize"><option value="wide">YouTube 16:9</option><option value="vertical">Shorts 9:16</option></select></div></div>
-<div style="background:#10283a;border:1px solid #54748b;border-radius:12px;padding:12px;margin:10px 0"><strong>🔊 Free Local Piper English Voice</strong><p>Run START_PIPER_WINDOWS.bat on your laptop, then click the button below. Keep the server window open during export.</p><button type="button" id="piperCheck">Check Piper Connection</button><p id="piperStatus" role="status">Not checked.</p></div><label for="docNarration">Automatic English voiceover script</label><textarea id="docNarration" rows="4" placeholder="Example: Ancient Egypt was home to remarkable pyramids and pharaohs."></textarea><p>Free automatic English voice uses the Piper server running on your own laptop. Start the companion server first; no paid API or uploaded MP3 needed.</p><div style="background:#0f172a;border:1px solid #64748b;padding:14px;border-radius:12px;margin:12px 0"><strong>🎙️ Reliable free voice recording</strong><p>Record your narration here, or upload an MP3/WAV. Recorded audio will be included directly in the exported documentary. Piper automatic voice can be exported when the local server is running.</p><button type="button" id="docMicStart">Start microphone recording</button><button type="button" id="docMicStop" disabled>Stop recording</button><button type="button" id="docMicClear" disabled>Clear recording</button><audio id="docMicPreview" controls style="display:none;width:100%;margin-top:12px"></audio><p id="docMicStatus" role="status">No microphone recording yet.</p></div><label for="docAudio">Voiceover audio (optional: WebM, MP3, WAV)</label><input type="file" id="docAudio" accept="audio/*,.webm"/><label for="docMusic">Background music (optional)</label><input type="file" id="docMusic" accept="audio/*,.webm"/><canvas id="docCanvas" width="1280" height="720"></canvas><div><button id="docPreview">Preview</button><button id="docExport">Export Documentary WebM</button><button id="docStop" disabled>Stop</button></div><p id="docStatus" role="status">Click Create Documentary Scenes to begin.</p>
+<div style="background:#10283a;border:1px solid #54748b;border-radius:12px;padding:12px;margin:10px 0"><strong>🔊 Free Local Piper English Voice</strong><p>Run START_PIPER_WINDOWS.bat on your laptop, then click the button below. Keep the server window open during export.</p><button type="button" id="piperCheck">Check Piper Connection</button><button type="button" id="piperTest">▶ Test English Voice</button><p id="piperStatus" role="status">Not checked.</p></div><label for="docNarration">Automatic English voiceover script</label><textarea id="docNarration" rows="4" placeholder="Example: Ancient Egypt was home to remarkable pyramids and pharaohs."></textarea><p>Free automatic English voice uses the Piper server running on your own laptop. Start the companion server first; no paid API or uploaded MP3 needed.</p><div style="background:#0f172a;border:1px solid #64748b;padding:14px;border-radius:12px;margin:12px 0"><strong>🎙️ Reliable free voice recording</strong><p>Record your narration here, or upload an MP3/WAV. Recorded audio will be included directly in the exported documentary. Piper automatic voice can be exported when the local server is running.</p><button type="button" id="docMicStart">Start microphone recording</button><button type="button" id="docMicStop" disabled>Stop recording</button><button type="button" id="docMicClear" disabled>Clear recording</button><audio id="docMicPreview" controls style="display:none;width:100%;margin-top:12px"></audio><p id="docMicStatus" role="status">No microphone recording yet.</p></div><label for="docAudio">Voiceover audio (optional: WebM, MP3, WAV)</label><input type="file" id="docAudio" accept="audio/*,.webm"/><label for="docMusic">Background music (optional)</label><input type="file" id="docMusic" accept="audio/*,.webm"/><canvas id="docCanvas" width="1280" height="720"></canvas><div><button id="docPreview">Preview (photos + English voice)</button><button id="docExport">Export Documentary WebM</button><button id="docStop" disabled>Stop</button></div><p id="docStatus" role="status">Click Create Documentary Scenes to begin.</p>
 </section>
 <script>
 (()=>{
@@ -695,6 +695,25 @@ function text(ctx,str,x,y,maxWidth,fontSize=42){ctx.fillStyle='#fff';ctx.font='b
    }catch(e){status.textContent='❌ Local Piper not running. Run START_PIPER_WINDOWS.bat first.';}
  }
  el('piperCheck').addEventListener('click',checkPiper);
+ let piperTestAudio=null;
+ el('piperTest').addEventListener('click',async()=>{
+   const status=el('piperStatus'),button=el('piperTest');
+   button.disabled=true;status.textContent='Generating English test voice...';
+   try{
+     if(piperTestAudio){piperTestAudio.pause();URL.revokeObjectURL(piperTestAudio.src);}
+     const response=await fetch(PIPER_URL+'/speak',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:el('docNarration').value.trim()||'Hello! This is my first AI voice test.'})});
+     if(!response.ok)throw Error('Piper server returned '+response.status);
+     const blob=await response.blob();
+     if(blob.size<1000)throw Error('Piper returned empty audio.');
+     const url=URL.createObjectURL(new Blob([blob],{type:'audio/wav'}));
+     piperTestAudio=new Audio(url);
+     piperTestAudio.onended=()=>{URL.revokeObjectURL(url);status.textContent='✅ Voice test finished. Now try Export Documentary WebM.';};
+     await piperTestAudio.play();
+     status.textContent='🔊 Playing English voice now. Check laptop volume.';
+   }catch(e){status.textContent='❌ Voice test failed: '+e.message;}
+   finally{button.disabled=false;}
+ });
+
 let docRecordedAudio=null, docMicRecorder=null, docMicStream=null, docMicParts=[], docMicUrl=null;
 const micStatus=el('docMicStatus');
 el('docMicStart').onclick=async()=>{
@@ -727,7 +746,7 @@ async function recorderFor(canvas,prefix,onDone,onFail){
  const stream=canvas.captureStream(30),parts=[];
  const videoTrack=stream.getVideoTracks()[0];
  const pushFrame=()=>{if(prefix==='doc'&&videoTrack&&typeof videoTrack.requestFrame==='function')videoTrack.requestFrame();};
- let audioCtx=null,sources=[];
+ let audioCtx=null,sources=[],monitor=null;
  const narration=el(prefix+'Narration').value.trim();
  if(narration&&el(prefix+'Audio').files.length)throw Error('Use either automatic narration or an uploaded voiceover, not both.');
  const voice=el(prefix+'Audio').files[0],music=el(prefix+'Music').files[0];
@@ -747,7 +766,11 @@ async function recorderFor(canvas,prefix,onDone,onFail){
     voiceDuration=voiceBuffer.duration;
     const source=audioCtx.createBufferSource(),gain=audioCtx.createGain();
     source.buffer=voiceBuffer;gain.gain.value=1;
-    source.connect(gain);gain.connect(dest);sources.push(source);
+    source.connect(gain);gain.connect(dest);
+    // Monitor narration during export, so silent output is immediately obvious.
+    if(!monitor){monitor=audioCtx.createGain();monitor.gain.value=.8;monitor.connect(audioCtx.destination);}
+    gain.connect(monitor);
+    sources.push(source);
    }
    if(music){
     const buffer=await audioCtx.decodeAudioData(await music.arrayBuffer());
@@ -755,7 +778,9 @@ async function recorderFor(canvas,prefix,onDone,onFail){
     source.buffer=buffer;source.loop=true;gain.gain.value=.17;
     source.connect(gain);gain.connect(dest);sources.push(source);
    }
-   dest.stream.getAudioTracks().forEach(track=>stream.addTrack(track));
+   const tracks=dest.stream.getAudioTracks();
+   if(!tracks.length)throw Error('No audio track created. Export cancelled.');
+   tracks.forEach(track=>stream.addTrack(track));
   }
   const rec=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:3500000});
   rec.ondataavailable=e=>{if(e.data.size)parts.push(e.data)};
@@ -770,7 +795,10 @@ async function recorderFor(canvas,prefix,onDone,onFail){
   };
   rec.onerror=()=>onFail('Recording failed.');
   return {rec,pushFrame,voiceDuration,start(){
-   rec.start(500);sources.forEach(source=>source.start(0));
+   if(audioCtx&&audioCtx.state!=='running')throw Error('Browser audio is suspended. Click the export button again.');
+   rec.start(500);
+   // A small delay lets the recorder initialize before speech begins.
+   sources.forEach(source=>source.start(audioCtx.currentTime+0.35));
   }};
  }catch(e){stream.getTracks().forEach(t=>t.stop());if(audioCtx)audioCtx.close();throw e}
 }
@@ -841,6 +869,8 @@ function stopDoc(){
  const job=docJob;docJob=null;
  if(job.timer)clearInterval(job.timer);
  if(job.raf)cancelAnimationFrame(job.raf);
+ if(job.previewSource){try{job.previewSource.stop()}catch(_){}}
+ if(job.previewCtx){job.previewCtx.close().catch(()=>{});}
  if(job.rec&&job.rec.state!=='inactive')job.rec.stop();
  el('docStop').disabled=true;el('docExport').disabled=false;
 }
@@ -850,7 +880,23 @@ async function runDoc(exporting){
  const count=images.length||Number(el('docSceneCount').value);
  const per=Number(el('docDuration').value);
  const duration=count*per;
- let voiceJob=null,rec=null;
+ let voiceJob=null,rec=null,previewCtx=null,previewSource=null,previewDuration=0;
+ if(!exporting&&el('docNarration').value.trim()){
+  status.textContent='Loading Piper English voice for preview...';
+  try{
+   previewCtx=new (window.AudioContext||window.webkitAudioContext)();
+   await previewCtx.resume();
+   const buffer=await createSpeechBuffer(previewCtx,el('docNarration').value.trim());
+   previewDuration=buffer.duration;
+   previewSource=previewCtx.createBufferSource();
+   previewSource.buffer=buffer;
+   previewSource.connect(previewCtx.destination);
+  }catch(e){
+   if(previewCtx)await previewCtx.close().catch(()=>{});
+   status.textContent='Preview voice error: '+e.message;
+   return;
+  }
+ }
  if(exporting){
   try{
    voiceJob=await recorderFor(el('docCanvas'),'doc',
@@ -860,11 +906,12 @@ async function runDoc(exporting){
   }catch(e){status.textContent=e.message;return}
  }
  el('docStop').disabled=false;el('docExport').disabled=true;
- const job={rec,timer:null,raf:0};docJob=job;
+ const job={rec,timer:null,raf:0,previewCtx,previewSource};docJob=job;
  // Record on a regular timer instead of relying only on requestAnimationFrame.
  // This is important when Chrome opens the screen/tab sharing UI.
  const started=performance.now();let lastScene=0;
  if(exporting)voiceJob.start();
+ if(previewSource)previewSource.start(previewCtx.currentTime+0.1);
  function tick(){
   if(docJob!==job)return;
   const t=(performance.now()-started)/1000;
@@ -877,7 +924,7 @@ async function runDoc(exporting){
    lastScene=scene;
    status.textContent=(exporting?'Recording':'Previewing')+' scene '+scene+' of '+count+' ('+Math.floor(t)+'s / '+duration+'s)';
   }
-  if(t>=Math.max(duration,voiceJob?.voiceDuration||0)){
+  if(t>=Math.max(duration,(voiceJob?.voiceDuration||previewDuration||0)+0.8)){
    stopDoc();if(!exporting)status.textContent='Preview finished.';
   }
  }
